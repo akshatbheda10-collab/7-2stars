@@ -4,15 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#070514">
+<meta name="robots" content="noindex">
 <title>Star Champions - Class Rewards League</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏆</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>if (typeof Html5QrcodeScanner === 'undefined') document.write('<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"><\/script>');</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
-<!-- Cloud engine (only used if you paste a Firebase config at the top of the main script) -->
+<!-- Cloud engine: shares one class between every device (needs the one-time Firebase setup in Teacher Hub > Cloud & Backup) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getFirestore, doc, onSnapshot, runTransaction, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -29,7 +31,7 @@ window.CloudInit = function (cfg, room, onRemote) {
         let data = null;
         try { if (snap.exists()) data = JSON.parse(snap.data().json); } catch (e) {}
         onRemote(snap.exists(), data, null); done(true);
-      }, err => { onRemote(false, null, err.message); done(false); });
+      }, err => { onRemote(false, null, err.code || err.message); done(false); });
       setTimeout(() => done(false), 9000);
     } catch (e) { onRemote(false, null, e.message); done(false); }
   });
@@ -54,95 +56,88 @@ window.CloudPublish = async function (payload) {
 </script>
 
 <style>
-  :root { --bg:#070514; --mute:#a9a4d3; --line:rgba(255,255,255,.1); --gold:#fbbf24; --pink:#fd79a8; --purple:#8b7cf6; --blue:#38bdf8; --green:#34d399; }
+  :root { --bg:#070514; --mute:#a9a4d3; --line:rgba(255,255,255,.1); --gold:#fbbf24; }
   * { box-sizing:border-box; }
   html, body { margin:0; background:var(--bg); color:#f4f2ff; overflow-x:hidden; }
-  body { font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif; min-height:100vh; line-height:1.4; }
+  body { font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif; min-height:100vh; line-height:1.45; }
   h1,h2,h3,h4,p { margin:0; }
   button { font-family:inherit; }
   ::-webkit-scrollbar { width:7px; height:7px; } ::-webkit-scrollbar-thumb { background:#3b3566; border-radius:8px; }
   .disp { font-family:'Fredoka','Arial Rounded MT Bold','Trebuchet MS',system-ui,sans-serif; }
 
   #bg3d { position:fixed; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; }
-  .aurora { position:fixed; inset:0; z-index:0; pointer-events:none; animation:aur 16s ease-in-out infinite alternate;
-    background: radial-gradient(60% 50% at 12% 8%, rgba(139,124,246,.4), transparent 60%), radial-gradient(50% 40% at 92% 15%, rgba(253,121,168,.3), transparent 60%), radial-gradient(60% 50% at 50% 108%, rgba(56,189,248,.28), transparent 60%); }
-  @keyframes aur { to { filter:hue-rotate(50deg) saturate(1.4); } }
+  .aurora { position:fixed; inset:0; z-index:0; pointer-events:none;
+    background: radial-gradient(60% 50% at 12% 6%, rgba(139,124,246,.32), transparent 60%), radial-gradient(50% 40% at 92% 12%, rgba(253,121,168,.2), transparent 60%), radial-gradient(60% 50% at 50% 108%, rgba(56,189,248,.2), transparent 60%); }
 
-  /* layout helpers */
-  .flex{display:flex}.col{flex-direction:column}.ac{align-items:center}.jb{justify-content:space-between}.jc{justify-content:center}.fw{flex-wrap:wrap}
+  .flex{display:flex}.ac{align-items:center}.jb{justify-content:space-between}.jc{justify-content:center}.fw{flex-wrap:wrap}
   .gap4{gap:4px}.gap8{gap:8px}.gap12{gap:12px}.gap16{gap:16px}.gap24{gap:24px}.f1{flex:1;min-width:0}.tc{text-align:center}
   .mt4{margin-top:4px}.mt8{margin-top:8px}.mt12{margin-top:12px}.mt16{margin-top:16px}.mt24{margin-top:24px}
-  .w100{width:100%}.hide{display:none!important}.trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rel{position:relative}
+  .hide{display:none!important}.trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .mono{font-family:ui-monospace,Consolas,Menlo,monospace}.up{text-transform:uppercase}.b{font-weight:800}
-  .tiny{font-size:11px;color:var(--mute)}.small{font-size:13px}.gold{color:#fde68a}.pinkc{color:#f9a8d4}.muted{color:var(--mute)}
-  .stack > * + * { margin-top:22px; }
-  .wrap { position:relative; z-index:10; max-width:1180px; margin:0 auto; padding:26px 16px 60px; width:100%; }
+  .tiny{font-size:12px;color:var(--mute)}.small{font-size:13.5px}.gold{color:#fde68a}.pinkc{color:#f9a8d4}.muted{color:var(--mute)}
+  .stack > * + * { margin-top:20px; }
+  .wrap { position:relative; z-index:10; max-width:1120px; margin:0 auto; padding:26px 16px 70px; width:100%; }
   .cols-2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; }
-  .cols-3 { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:18px; }
-  .cols-main { display:grid; grid-template-columns:2fr 1fr; gap:20px; }
+  .cols-3 { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:16px; }
+  .cols-main { display:grid; grid-template-columns:2fr 1fr; gap:18px; }
   @media (max-width:900px){ .cols-main{grid-template-columns:1fr;} .hide-sm{display:none!important;} }
 
-  /* topbar */
-  .topbar { position:sticky; top:0; z-index:40; padding:10px 16px; background:rgba(10,7,30,.65); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-bottom:1px solid var(--line); }
-  .topin { max-width:1180px; margin:0 auto; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; }
-  .logo { display:flex; align-items:center; gap:12px; cursor:pointer; }
-  .logo-badge { width:44px; height:44px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:24px; background:linear-gradient(135deg,#fde68a,#f59e0b); box-shadow:0 4px 0 #b45309, 0 8px 20px rgba(245,158,11,.4); transform:rotate(-6deg); }
-  .brand { font-size:22px; font-weight:700; line-height:1; }
-  .neon { background:linear-gradient(90deg,#fde68a,#fb7185,#a78bfa,#38bdf8,#fde68a); background-size:300% 100%; -webkit-background-clip:text; background-clip:text; color:transparent; animation:flow 6s linear infinite; }
-  @keyframes flow { to { background-position:300% 0; } }
-  .nav { display:flex; flex-wrap:wrap; gap:8px; }
-  .nav-btn { display:inline-flex; align-items:center; gap:7px; padding:9px 14px; border-radius:12px; font-weight:700; font-size:13px; color:#d9d5ff; background:rgba(255,255,255,.07); border:1px solid var(--line); cursor:pointer; transition:.15s; }
-  .nav-btn:hover { background:rgba(255,255,255,.14); transform:translateY(-1px); }
-  .nav-btn.active { background:linear-gradient(135deg,#7c6cf2,#c026d3); color:#fff; border-color:transparent; box-shadow:0 6px 20px rgba(124,108,242,.5); }
+  .topbar { position:sticky; top:0; z-index:40; padding:10px 16px; background:rgba(10,7,30,.7); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-bottom:1px solid var(--line); }
+  .topin { max-width:1120px; margin:0 auto; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; }
+  .logo { display:flex; align-items:center; gap:11px; cursor:pointer; }
+  .logo-badge { width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:22px; background:linear-gradient(135deg,#fde68a,#f59e0b); box-shadow:0 3px 0 #b45309; }
+  .brand { font-size:20px; font-weight:700; line-height:1; }
+  .neon { background:linear-gradient(90deg,#fde68a,#fb7185,#a78bfa); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .nav { display:flex; flex-wrap:wrap; gap:6px; }
+  .nav-btn { display:inline-flex; align-items:center; gap:7px; padding:8px 13px; border-radius:11px; font-weight:700; font-size:13px; color:#d9d5ff; background:transparent; border:1px solid transparent; cursor:pointer; transition:.15s; }
+  .nav-btn:hover { background:rgba(255,255,255,.08); }
+  .nav-btn.active { background:rgba(139,124,246,.22); color:#fff; border-color:rgba(167,139,250,.5); }
+  .nav-btn.status { border-color:var(--line); }
   .ic { display:inline-block; vertical-align:middle; flex-shrink:0; }
-  .dot { width:9px; height:9px; border-radius:50%; background:var(--green); box-shadow:0 0 8px currentColor; display:inline-block; }
+  .dot { width:9px; height:9px; border-radius:50%; background:#34d399; display:inline-block; flex-shrink:0; }
   .dot.warn { background:var(--gold); } .dot.bad { background:#fb7185; }
 
-  /* cards */
-  .card { border-radius:24px; padding:22px; border:1px solid transparent;
-    background: linear-gradient(rgba(20,15,48,.78),rgba(20,15,48,.78)) padding-box, linear-gradient(135deg,rgba(167,139,250,.6),rgba(255,255,255,.07) 45%,rgba(253,121,168,.45)) border-box;
-    backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); box-shadow:0 18px 50px rgba(0,0,0,.4); }
-  .card.gold-b { background: linear-gradient(rgba(25,18,40,.82),rgba(25,18,40,.82)) padding-box, linear-gradient(135deg,#fbbf24,rgba(255,255,255,.1) 50%,#fd79a8) border-box; }
-  .ctitle { font-size:19px; font-weight:700; }
-  .hero-title { font-size:clamp(38px,7vw,68px); font-weight:700; line-height:1.05; }
-  .chip { display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:800; letter-spacing:.04em; padding:3px 10px; border-radius:99px; background:rgba(167,139,250,.18); border:1px solid rgba(167,139,250,.4); color:#ddd6fe; }
-  .chip.gold { background:rgba(251,191,36,.14); border-color:rgba(251,191,36,.5); color:#fde68a; }
+  .card { border-radius:20px; padding:20px; background:rgba(18,14,44,.74); border:1px solid rgba(255,255,255,.09); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); box-shadow:0 10px 30px rgba(0,0,0,.35); }
+  .card.gold-b { border-color:rgba(251,191,36,.4); }
+  .ctitle { font-size:18px; font-weight:700; }
+  .hero-title { font-size:clamp(32px,5.5vw,54px); font-weight:700; line-height:1.08; }
+  .chip { display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:800; letter-spacing:.05em; padding:3px 10px; border-radius:99px; background:rgba(167,139,250,.16); border:1px solid rgba(167,139,250,.4); color:#ddd6fe; }
+  .chip.gold { background:rgba(251,191,36,.12); border-color:rgba(251,191,36,.45); color:#fde68a; }
 
-  /* tilt */
   .tilt { position:relative; transform-style:preserve-3d; transition:transform .15s ease-out; will-change:transform; }
-  .tilt::after { content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none; opacity:0; transition:opacity .2s;
-    background:radial-gradient(280px circle at var(--mx,50%) var(--my,50%), rgba(255,255,255,.2), transparent 45%); }
+  .tilt::after { content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none; opacity:0; transition:opacity .2s; background:radial-gradient(280px circle at var(--mx,50%) var(--my,50%), rgba(255,255,255,.16), transparent 45%); }
   .tilt:hover::after { opacity:1; }
   .lift { transform:translateZ(36px); }
 
-  /* buttons */
-  .btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:10px 16px; border-radius:13px; font-weight:800; font-size:13px; color:#fff; cursor:pointer; border:0; position:relative; text-decoration:none;
-    box-shadow:0 5px 0 var(--sh,#312e81), 0 10px 18px rgba(0,0,0,.35); transition:transform .08s, box-shadow .08s, filter .15s; background:var(--bgc,#6c5ce7); }
-  .btn:hover { filter:brightness(1.13); }
-  .btn:active { transform:translateY(4px); box-shadow:0 1px 0 var(--sh,#312e81), 0 3px 8px rgba(0,0,0,.3); }
-  .btn:disabled { opacity:.45; cursor:not-allowed; filter:grayscale(.7); box-shadow:0 2px 0 #1e1b3a; transform:none; }
-  .btn.sm { padding:6px 10px; font-size:12px; border-radius:10px; box-shadow:0 3px 0 var(--sh,#312e81), 0 6px 12px rgba(0,0,0,.3); }
-  .btn.lg { padding:14px 22px; font-size:15px; }
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:10px 16px; border-radius:12px; font-weight:800; font-size:13px; color:#fff; cursor:pointer; border:0; text-decoration:none;
+    box-shadow:0 4px 0 var(--sh,#312e81), 0 8px 14px rgba(0,0,0,.3); transition:transform .08s, box-shadow .08s, filter .15s; background:var(--bgc,#6c5ce7); }
+  .btn:hover { filter:brightness(1.12); }
+  .btn:active { transform:translateY(3px); box-shadow:0 1px 0 var(--sh,#312e81), 0 3px 8px rgba(0,0,0,.3); }
+  .btn:disabled { opacity:.45; cursor:not-allowed; filter:grayscale(.7); transform:none; }
+  .btn.sm { padding:6px 11px; font-size:12px; border-radius:10px; box-shadow:0 3px 0 var(--sh,#312e81), 0 5px 10px rgba(0,0,0,.25); }
+  .btn.lg { padding:13px 22px; font-size:15px; }
   .btn.block { display:flex; width:100%; }
   .purple{--bgc:#6c5ce7;--sh:#3b2fa6}.pink{--bgc:#ec4899;--sh:#9d174d}.blue{--bgc:#0ea5e9;--sh:#0c5a86}.green{--bgc:#10b981;--sh:#047857}
   .slate{--bgc:#3a3566;--sh:#211d3f}.red{--bgc:#f43f5e;--sh:#9f1239}.goldb{--bgc:#fbbf24;--sh:#b45309;color:#1c1917}
 
-  .field { width:100%; background:rgba(7,5,20,.75); border:1px solid rgba(255,255,255,.14); border-radius:13px; padding:11px 13px; font-size:14px; color:#fff; outline:none; font-family:inherit; }
-  .field:focus { border-color:#a78bfa; box-shadow:0 0 0 3px rgba(167,139,250,.28); }
+  .field { width:100%; background:rgba(7,5,20,.75); border:1px solid rgba(255,255,255,.14); border-radius:12px; padding:11px 13px; font-size:14px; color:#fff; outline:none; font-family:inherit; }
+  .field:focus { border-color:#a78bfa; box-shadow:0 0 0 3px rgba(167,139,250,.25); }
   label.lbl { display:block; font-size:12px; font-weight:800; color:#d4d0f5; margin-bottom:5px; }
 
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); overflow-x:auto; }
+  .tab { padding:11px 18px; font-weight:800; font-size:13.5px; color:var(--mute); background:none; border:0; border-bottom:3px solid transparent; cursor:pointer; white-space:nowrap; display:inline-flex; align-items:center; gap:8px; }
+  .tab:hover { color:#fff; } .tab.active { color:#fff; border-bottom-color:#a78bfa; }
+
   /* podium */
-  .stage-wrap { position:relative; perspective:1100px; padding-top:50px; margin-top:6px; }
+  .stage-wrap { position:relative; perspective:1100px; padding-top:50px; }
   .floor { position:absolute; left:50%; bottom:-40px; width:150%; height:300px; transform:translateX(-50%) perspective(520px) rotateX(70deg);
-    background-image:linear-gradient(rgba(167,139,250,.4) 1px,transparent 1px),linear-gradient(90deg,rgba(167,139,250,.4) 1px,transparent 1px); background-size:44px 44px;
+    background-image:linear-gradient(rgba(167,139,250,.35) 1px,transparent 1px),linear-gradient(90deg,rgba(167,139,250,.35) 1px,transparent 1px); background-size:44px 44px;
     -webkit-mask-image:radial-gradient(closest-side,#000 35%,transparent); mask-image:radial-gradient(closest-side,#000 35%,transparent); pointer-events:none; }
-  .beam { position:absolute; left:50%; top:0; width:260px; height:100%; transform:translateX(-50%); pointer-events:none; filter:blur(8px);
-    background:linear-gradient(180deg,rgba(253,224,71,.3),transparent 90%); clip-path:polygon(38% 0,62% 0,100% 100%,0 100%); }
-  .stage3d { position:relative; display:flex; gap:14px; align-items:flex-end; max-width:620px; margin:0 auto; transform-style:preserve-3d;
-    transform:rotateX(calc(-13deg + var(--ty,0) * 1deg)) rotateY(calc(var(--tx,0) * 1deg)); transition:transform .25s ease-out; }
+  .beam { position:absolute; left:50%; top:0; width:260px; height:100%; transform:translateX(-50%); pointer-events:none; filter:blur(8px); background:linear-gradient(180deg,rgba(253,224,71,.26),transparent 90%); clip-path:polygon(38% 0,62% 0,100% 100%,0 100%); }
+  .stage3d { position:relative; display:flex; gap:14px; align-items:flex-end; max-width:620px; margin:0 auto; transform-style:preserve-3d; transform:rotateX(calc(-13deg + var(--ty,0) * 1deg)) rotateY(calc(var(--tx,0) * 1deg)); transition:transform .25s ease-out; }
   .pod-col { flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; transform-style:preserve-3d; min-width:0; }
   .pod-person { text-align:center; margin-bottom:12px; transform:translateZ(36px); max-width:100%; }
-  .pod-avatar { width:66px; height:66px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:33px; margin:0 auto; background:#1b1740; border:3px solid var(--rim); box-shadow:0 0 24px var(--rim); animation:bob 3s ease-in-out infinite; }
+  .pod-avatar { width:66px; height:66px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:33px; margin:0 auto; background:#1b1740; border:3px solid var(--rim); box-shadow:0 0 22px var(--rim); animation:bob 3s ease-in-out infinite; }
   .p1 { --rim:#fbbf24; } .p2 { --rim:#cbd5e1; } .p3 { --rim:#d97706; }
   .p1 .pod-avatar { width:82px; height:82px; font-size:42px; }
   @keyframes bob { 50% { transform:translateY(-9px); } }
@@ -152,50 +147,46 @@ window.CloudPublish = async function (payload) {
   .pod.p2 .slice, .pod.p2 .pod-face { background:linear-gradient(180deg,#f1f5f9,#94a3b8 60%,#475569); }
   .pod.p3 .slice, .pod.p3 .pod-face { background:linear-gradient(180deg,#fdba74,#d97706 60%,#7c2d12); }
   .pod-face { display:flex; justify-content:center; padding-top:14px; font-family:'Fredoka',system-ui; font-weight:700; font-size:34px; color:rgba(0,0,0,.5); box-shadow:inset 0 2px 0 rgba(255,255,255,.6); }
-  .coin-wrap { perspective:700px; height:130px; display:flex; align-items:center; justify-content:center; }
-  .coin { width:96px; height:96px; position:relative; transform-style:preserve-3d; animation:coinSpin 5s linear infinite; }
-  .coin i { position:absolute; inset:0; border-radius:50%; display:flex; align-items:center; justify-content:center; font-style:normal; font-size:58px; color:#92400e; background:radial-gradient(circle at 35% 30%,#fff3b0,#fbbf24 48%,#b45309); border:3px solid #f59e0b; }
-  @keyframes coinSpin { to { transform:rotateY(360deg); } }
 
-  /* standings */
-  .srow { display:flex; align-items:center; gap:12px; padding:11px 14px; border-radius:16px; background:rgba(7,5,20,.55); border:1px solid rgba(255,255,255,.08); border-left:4px solid var(--rc,#3b3566); transition:.15s; }
-  .srow:hover { transform:translateX(4px); background:rgba(40,30,90,.5); }
-  .srow.first { border-color:rgba(251,191,36,.5); border-left-color:#fbbf24; box-shadow:0 0 24px rgba(251,191,36,.15); }
-  .rank { min-width:38px; height:32px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-family:'Fredoka',system-ui; font-weight:700; font-size:13px; background:rgba(255,255,255,.1); color:#b6b1e0; }
+  .srow { display:flex; align-items:center; gap:12px; padding:10px 14px; border-radius:14px; background:rgba(7,5,20,.5); border:1px solid rgba(255,255,255,.07); border-left:4px solid var(--rc,#3b3566); transition:.15s; }
+  .srow:hover { background:rgba(40,30,90,.5); }
+  .srow.first { border-color:rgba(251,191,36,.45); border-left-color:#fbbf24; }
+  .rank { min-width:38px; height:30px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-family:'Fredoka',system-ui; font-weight:700; font-size:13px; background:rgba(255,255,255,.1); color:#b6b1e0; }
   .r1{background:#fbbf24;color:#1c1917}.r2{background:#cbd5e1;color:#1c1917}.r3{background:#d97706;color:#fff}
-  .av { font-size:26px; width:40px; text-align:center; }
+  .av { font-size:25px; width:38px; text-align:center; }
   .sname { font-weight:800; font-size:14.5px; }
-  .bar { width:130px; height:10px; border-radius:99px; background:rgba(255,255,255,.1); overflow:hidden; }
-  .bar i, .xp i { display:block; height:100%; width:0; border-radius:99px; background:linear-gradient(90deg,#6c5ce7,#fd79a8,#fdcb6e); transition:width 1s cubic-bezier(.2,.8,.2,1); box-shadow:0 0 12px rgba(253,121,168,.6); }
-  .xp { height:14px; border-radius:99px; background:rgba(255,255,255,.1); overflow:hidden; }
-  .starpill { font-family:'Fredoka',system-ui; font-weight:700; font-size:15px; color:#fde68a; padding:5px 12px; border-radius:11px; background:rgba(251,191,36,.12); border:1px solid rgba(251,191,36,.35); white-space:nowrap; }
+  .bar { width:120px; height:9px; border-radius:99px; background:rgba(255,255,255,.1); overflow:hidden; }
+  .bar i, .xp i { display:block; height:100%; width:0; border-radius:99px; background:linear-gradient(90deg,#6c5ce7,#fd79a8,#fdcb6e); transition:width 1s cubic-bezier(.2,.8,.2,1); }
+  .xp { height:13px; border-radius:99px; background:rgba(255,255,255,.1); overflow:hidden; }
+  .starpill { font-family:'Fredoka',system-ui; font-weight:700; font-size:15px; color:#fde68a; padding:4px 11px; border-radius:10px; background:rgba(251,191,36,.1); border:1px solid rgba(251,191,36,.3); white-space:nowrap; }
   .scroll { overflow-y:auto; padding-right:4px; }
-  .feed { padding:10px 12px; border-radius:13px; background:rgba(7,5,20,.5); border:1px solid rgba(255,255,255,.07); font-size:13px; display:flex; gap:10px; }
-  .box { border-radius:18px; padding:16px; background:rgba(7,5,20,.65); border:1px solid rgba(255,255,255,.1); text-align:center; }
-  .bignum { font-family:'Fredoka',system-ui; font-weight:700; font-size:42px; line-height:1.1; }
-  .tile { display:block; width:100%; text-align:left; border:0; color:#fff; padding:24px; border-radius:26px; cursor:pointer; }
-  .prize-ic { width:68px; height:68px; border-radius:20px; background:rgba(255,255,255,.09); display:flex; align-items:center; justify-content:center; font-size:38px; margin:0 auto 12px; transform:translateZ(40px); }
-  .pill-status { display:inline-flex; align-items:center; gap:7px; padding:8px 12px; border-radius:12px; font-size:12.5px; font-weight:700; background:rgba(7,5,20,.6); border:1px solid var(--line); }
-  .notice { padding:14px 16px; border-radius:16px; font-size:13px; background:rgba(251,191,36,.1); border:1px solid rgba(251,191,36,.45); color:#fde68a; }
+  .feed { padding:10px 12px; border-radius:12px; background:rgba(7,5,20,.5); border:1px solid rgba(255,255,255,.06); font-size:13px; display:flex; gap:10px; }
+  .box { border-radius:16px; padding:14px; background:rgba(7,5,20,.6); border:1px solid rgba(255,255,255,.09); text-align:center; }
+  .bignum { font-family:'Fredoka',system-ui; font-weight:700; font-size:40px; line-height:1.1; }
+  .tile { display:block; width:100%; text-align:left; border:0; color:#fff; padding:22px; border-radius:22px; cursor:pointer; }
+  .prize-ic { width:64px; height:64px; border-radius:18px; background:rgba(255,255,255,.08); display:flex; align-items:center; justify-content:center; font-size:36px; margin:0 auto 12px; transform:translateZ(40px); }
+  .pill-status { display:inline-flex; align-items:center; gap:7px; padding:7px 12px; border-radius:11px; font-size:12.5px; font-weight:700; background:rgba(7,5,20,.6); border:1px solid var(--line); }
+  .notice { padding:13px 15px; border-radius:14px; font-size:13px; background:rgba(251,191,36,.09); border:1px solid rgba(251,191,36,.4); color:#fde68a; }
   .notice.bad { background:rgba(244,63,94,.1); border-color:rgba(244,63,94,.5); color:#fecdd3; }
-  .notice.ok { background:rgba(16,185,129,.1); border-color:rgba(16,185,129,.45); color:#a7f3d0; }
+  .steps { margin:8px 0 0; padding-left:20px; display:grid; gap:7px; font-size:13px; color:#d4d0f5; }
+  .qrbox { background:#fff; padding:12px; border-radius:16px; box-shadow:0 0 40px rgba(139,124,246,.4); flex-shrink:0; }
 
-  /* overlays */
   .star-pop { position:fixed; left:50%; top:42%; z-index:120; pointer-events:none; font-family:'Fredoka',system-ui; font-weight:700; font-size:min(20vw,140px); color:#fde68a; white-space:nowrap; text-shadow:0 0 40px rgba(253,203,110,.9),0 8px 0 #b45309; animation:starPop 1.3s cubic-bezier(.2,1.4,.4,1) forwards; }
   @keyframes starPop { 0%{transform:translate(-50%,-50%) scale(.2) rotate(-20deg);opacity:0} 25%{transform:translate(-50%,-50%) scale(1.15) rotate(5deg);opacity:1} 70%{transform:translate(-50%,-55%) scale(1);opacity:1} 100%{transform:translate(-50%,-120%) scale(.8);opacity:0} }
   .levelup { position:fixed; inset:0; z-index:125; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; background:rgba(7,5,20,.8); backdrop-filter:blur(6px); animation:fadeIn .3s ease; pointer-events:none; }
-  .levelup .big { font-size:110px; animation:coinSpin 1.6s ease-out 1; }
+  .levelup .big { font-size:110px; animation:spin 1.6s ease-out 1; }
+  @keyframes spin { to { transform:rotateY(360deg); } }
   @keyframes fadeIn { from{opacity:0} to{opacity:1} }
-  @keyframes rise { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:none} }
-  .wrap > * { animation:rise .35s ease both; }
+  @keyframes rise { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
+  .wrap > * { animation:rise .3s ease both; }
+  .wrap.quiet > * { animation:none; }
   #modal { display:none; position:fixed; inset:0; z-index:100; align-items:center; justify-content:center; padding:16px; background:rgba(7,5,20,.82); backdrop-filter:blur(6px); }
   #modal.open { display:flex; }
   #modal-content { max-width:560px; width:100%; max-height:90vh; overflow-y:auto; }
   #toast-container { position:fixed; bottom:20px; right:20px; z-index:130; display:flex; flex-direction:column; gap:8px; pointer-events:none; }
-  .toast { color:#fff; font-size:13px; font-weight:800; padding:11px 16px; border-radius:13px; border:1px solid rgba(255,255,255,.25); max-width:320px; box-shadow:0 10px 30px rgba(0,0,0,.4); transition:.3s; }
+  .toast { color:#fff; font-size:13px; font-weight:800; padding:11px 16px; border-radius:12px; border:1px solid rgba(255,255,255,.25); max-width:320px; box-shadow:0 10px 30px rgba(0,0,0,.4); transition:.3s; }
   #fatal { position:fixed; left:12px; right:12px; bottom:12px; z-index:200; }
 
-  /* projector */
   #projector { position:fixed; inset:0; z-index:90; background:radial-gradient(80% 60% at 50% 0%,#241a5e,#070514 70%); overflow:auto; padding:18px 28px 40px; }
   .proj-bar { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
   .proj-title { font-size:clamp(34px,6vw,76px); font-weight:700; text-align:center; margin-top:6px; }
@@ -218,13 +209,13 @@ window.CloudPublish = async function (payload) {
   <div class="topin">
     <div class="logo" onclick="switchView('leaderboard')">
       <div class="logo-badge">🏆</div>
-      <div><div class="brand disp neon">Star Champions</div><div class="tiny up" style="letter-spacing:.14em">Class Rewards League</div></div>
+      <div><div class="brand disp neon">Star Champions</div></div>
     </div>
     <div class="nav">
       <button class="nav-btn" id="nav-leaderboard" onclick="switchView('leaderboard')"><span data-ic="trophy"></span>Leaderboard</button>
       <button class="nav-btn" id="nav-student" onclick="openStudent()"><span data-ic="user"></span>Student</button>
-      <button class="nav-btn" id="nav-teacher" onclick="openTeacher()"><span data-ic="monitor"></span>Teacher Hub</button>
-      <button class="nav-btn" id="save-badge" onclick="openSaveModal()"><i class="dot" id="save-dot"></i><span id="save-text">Starting…</span></button>
+      <button class="nav-btn" id="nav-teacher" onclick="openTeacher()"><span data-ic="monitor"></span>Teacher</button>
+      <button class="nav-btn status" id="save-badge" onclick="openSaveModal()"><i class="dot" id="save-dot"></i><span id="save-text">Starting…</span></button>
     </div>
   </div>
 </header>
@@ -237,14 +228,11 @@ window.CloudPublish = async function (payload) {
 
 <script>
 /* ============================================================
-   TEACHER SETUP  (read me!)
-   To make students' stars land on YOUR class (any device), paste
-   your free Firebase web config in place of null below, e.g.
-     const FIREBASE_CONFIG = { apiKey:"...", authDomain:"...", projectId:"...", appId:"..." };
-   The Teacher Hub → "Save & Connect" button explains the 5 steps.
+   OPTIONAL: paste your Firebase config here ONCE and the plain
+   website address works on every device with no extra link.
+   (Teacher Hub > Cloud & Backup writes the exact line for you.)
    ============================================================ */
 const FIREBASE_CONFIG = null;
-const CLASS_ROOM = 'CLASS-1';
 /* ============================================================ */
 
 const IC = {
@@ -257,7 +245,6 @@ const IC = {
   list:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
   sliders:'<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
   lock:'<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
-  expand:'<path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>',
   rotate:'<path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/>',
   trash:'<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
   key:'<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>',
@@ -267,13 +254,13 @@ const IC = {
   x:'<path d="M18 6L6 18M6 6l12 12"/>',
   folder:'<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
   cloud:'<path d="M18 10h-1.3A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>',
-  save:'<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
+  copy:'<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
   cast:'<path d="M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6M2 12a9 9 0 0 1 8 8M2 16a5 5 0 0 1 4 4M2 20h.01"/>'
 };
 const ic = (n, s = 16) => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n] || ''}</svg>`;
 
-/* ===== STORAGE: localStorage + IndexedDB + tab memory ===== */
+/* ===== STORAGE (this device): localStorage + IndexedDB + tab memory ===== */
 const Store = (() => {
   const KEY = 'StarCentral_V4', LEGACY = 'ClassroomStarRewards_V3', DBN = 'StarCentralDB', TAG = 'SC4::';
   const caps = { local:false, idb:false, tab:false };
@@ -318,9 +305,11 @@ const LEVELS = [
   { min:0, name:'Rookie', icon:'🥚' }, { min:5, name:'Sparkler', icon:'✨' }, { min:15, name:'Rising Star', icon:'🌟' },
   { min:30, name:'All-Star', icon:'🚀' }, { min:50, name:'Champion', icon:'🏆' }, { min:80, name:'Legend', icon:'🐉' }, { min:120, name:'Mythic', icon:'👑' }
 ];
-let state = { students:[], prizes:DEFAULT_PRIZES(), currentQrToken:null, activity:[], redemptions:[], settings:{ multiplier:1, passB64:null }, savedAt:0 };
-let ui = { view:'leaderboard', teacher:false, activeStudentId:null, projector:null };
-const Cloud = { configured:!!FIREBASE_CONFIG, on:false, exists:false, error:null };
+const RULES_TEXT = "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /starChampionsRooms/{room} {\n      allow read, write: if true;\n    }\n  }\n}";
+
+let state = { students:[], prizes:DEFAULT_PRIZES(), currentQrToken:null, activity:[], redemptions:[], settings:{ multiplier:1, passB64:null, passHash:null }, savedAt:0 };
+let ui = { view:'leaderboard', tab:'roster', teacher:false, activeStudentId:null, projector:null, picked:null };
+const Cloud = { configured:false, cfg:null, room:'CLASS-1', on:false, exists:false, error:null, pub:false };
 const FileSave = { handle:null, status:'off', timer:null, last:null, supported:(typeof window.showSaveFilePicker === 'function') };
 let html5QrScanner = null, claiming = false, pendingConfirm = null, lastSaveTime = null;
 
@@ -340,24 +329,60 @@ function getSortedStudents() { return [...state.students].sort((a, b) => b.total
 function getStudentRank(id) { const i = getSortedStudents().findIndex(s => s.id === id); return i === -1 ? state.students.length : i + 1; }
 function activeStudent() { return state.students.find(s => s.id === ui.activeStudentId); }
 
-function getPayload() { return { version:5, students:state.students, prizes:state.prizes, currentQrToken:state.currentQrToken, activity:state.activity, redemptions:state.redemptions, settings:state.settings, savedAt:state.savedAt }; }
+function getPayload() { return { version:6, students:state.students, prizes:state.prizes, currentQrToken:state.currentQrToken, activity:state.activity, redemptions:state.redemptions, settings:state.settings, savedAt:state.savedAt }; }
 function applyData(o) {
   state.students = (o.students || []).map(s => ({ id:s.id, name:String(s.name || 'Student'), pin:String(s.pin || newCode()), stars:s.stars | 0, totalEarned:Math.max(s.totalEarned | 0, s.stars | 0), avatar:s.avatar || '🐶' }));
   state.prizes = Array.isArray(o.prizes) ? o.prizes : DEFAULT_PRIZES();
   state.currentQrToken = o.currentQrToken || state.currentQrToken || newCode();
   state.activity = Array.isArray(o.activity) ? o.activity : [];
   state.redemptions = Array.isArray(o.redemptions) ? o.redemptions : [];
-  state.settings = Object.assign({ multiplier:1, passB64:null }, o.settings || {});
+  state.settings = Object.assign({ multiplier:1, passB64:null, passHash:null }, o.settings || {});
   state.savedAt = o.savedAt || 0;
 }
-function saveState() {
-  state.savedAt = Date.now(); Store.save(getPayload()); lastSaveTime = state.savedAt; scheduleFileWrite(); updateSaveBadge();
+function saveState() { state.savedAt = Date.now(); Store.save(getPayload()); lastSaveTime = state.savedAt; scheduleFileWrite(); updateSaveBadge(); }
+
+/* ===== CLOUD CONFIG: baked line > link (#cfg=...) > remembered on this device ===== */
+function b64e(o) { return btoa(unescape(encodeURIComponent(JSON.stringify(o)))); }
+function b64d(s) { return JSON.parse(decodeURIComponent(escape(atob(s)))); }
+function resolveCloudConfig() {
+  let pick = FIREBASE_CONFIG ? { cfg:FIREBASE_CONFIG, room:'CLASS-1' } : null, fromHash = null;
+  try {
+    const m = (location.hash || '').match(/cfg=([^&]+)/);
+    if (m) {
+      const o = b64d(decodeURIComponent(m[1]));
+      if (o && o.cfg && o.cfg.projectId && o.cfg.apiKey) fromHash = o;
+      try { history.replaceState(null, '', location.href.split('#')[0]); } catch (e) {}
+    }
+  } catch (e) {}
+  if (fromHash) { try { localStorage.setItem('sc_fbcfg', JSON.stringify(fromHash)); } catch (e) {} if (!pick) pick = fromHash; }
+  if (!pick) { try { const o = JSON.parse(localStorage.getItem('sc_fbcfg') || 'null'); if (o && o.cfg && o.cfg.projectId) pick = o; } catch (e) {} }
+  Cloud.cfg = pick ? pick.cfg : null; Cloud.room = (pick && pick.room) || 'CLASS-1'; Cloud.configured = !!Cloud.cfg;
+}
+function studentLink() { return location.href.split('#')[0] + '#cfg=' + encodeURIComponent(b64e({ cfg:Cloud.cfg, room:Cloud.room })); }
+function parseFirebaseConfig(text) {
+  const ok = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId', 'measurementId'], out = {}, re = /["']?([A-Za-z]+)["']?\s*:\s*["']([^"']+)["']/g;
+  let m; while ((m = re.exec(text || ''))) if (ok.includes(m[1])) out[m[1]] = m[2];
+  return (out.apiKey && out.projectId && out.appId) ? out : null;
+}
+function connectCloudWizard() {
+  const t = $('fb-config-input'), cfg = parseFirebaseConfig(t ? t.value : '');
+  if (!cfg) { showToast('Could not find apiKey, projectId and appId. Paste the whole firebaseConfig block.', 'error'); return; }
+  const pack = { cfg, room:'CLASS-1' };
+  try { localStorage.setItem('sc_fbcfg', JSON.stringify(pack)); } catch (e) {}
+  location.hash = '#cfg=' + encodeURIComponent(b64e(pack)); location.reload();
+}
+function disconnectCloud() {
+  askConfirm('Disconnect this device from the cloud class? Your cloud data stays safe, and this device goes back to local-only mode.', () => {
+    try { localStorage.removeItem('sc_fbcfg'); } catch (e) {}
+    try { history.replaceState(null, '', location.href.split('#')[0]); } catch (e) {}
+    location.reload();
+  });
 }
 
-/* ===== mutate(): every change goes through here.
-   Cloud mode: atomic transaction on the shared class. Local mode: edits this device and saves. ===== */
+/* ===== mutate(): every change goes through here ===== */
 async function mutate(fn) {
-  if (Cloud.on && window.CloudMutate) {
+  if (Cloud.configured) {
+    if (!Cloud.on || !window.CloudMutate) { showToast('Not connected to the class yet. Check the internet and try again.', 'error'); return { error:'offline' }; }
     try {
       const r = await window.CloudMutate(fn);
       if (r.result && r.result.error) return r.result;
@@ -371,24 +396,23 @@ async function mutate(fn) {
   return res || { ok:true };
 }
 function explainError(res) {
-  const m = { 'no-class':'Your teacher has not started the cloud class yet.', 'bad-code':'That code is not valid or already used. Scan the one on screen!', 'no-student':'Could not find your account.' };
+  const m = { 'no-class':'Your teacher has not started the class yet.', 'bad-code':'That code is not valid or already used. Scan the one on screen!', 'no-student':'Could not find your account.', offline:'Not connected. Try again in a moment.', 'cloud-fail':'Could not save. Try again.' };
   return m[res.error] || 'Something went wrong. Try again.';
 }
 
-/* ===== save a copy to a file on the teacher's computer (Chrome / Edge) ===== */
+/* ===== optional: also save a copy to a file on the teacher's computer (Chrome/Edge) ===== */
 async function fileInit() {
   if (!FileSave.supported) return;
-  const h = await Store.rawGet('fileHandle'); if (!h) return;
-  FileSave.handle = h;
+  const h = await Store.rawGet('fileHandle'); if (!h) return; FileSave.handle = h;
   try { FileSave.status = (await h.queryPermission({ mode:'readwrite' })) === 'granted' ? 'on' : 'needs-permission'; } catch (e) { FileSave.status = 'needs-permission'; }
 }
 async function fileLink() {
-  if (!FileSave.supported) { showToast('This browser cannot do this. Use Chrome or Edge on a computer, or use Backup.', 'info'); return; }
+  if (!FileSave.supported) { showToast('This browser cannot do this. Use Chrome or Edge on a computer, or Download Backup.', 'info'); return; }
   try {
     const h = await window.showSaveFilePicker({ suggestedName:'StarChampions-data.json', types:[{ description:'Star Champions data', accept:{ 'application/json':['.json'] } }] });
     FileSave.handle = h; FileSave.status = 'on'; await Store.rawPut('fileHandle', h); await fileWrite();
-    showToast('Linked! Every change now saves to that file.', 'success'); updateSaveBadge(); refreshSaveCenter();
-  } catch (e) { if (e && e.name !== 'AbortError') showToast('This editor blocks file saving (' + (e.name || 'error') + '). Use Backup instead.', 'info'); }
+    showToast('Linked! Every change also saves to that file.', 'success'); updateSaveBadge(); refreshSaveCenter();
+  } catch (e) { if (e && e.name !== 'AbortError') showToast('This browser blocked file saving. Use Download Backup.', 'info'); }
 }
 async function fileWrite() {
   if (!FileSave.handle || FileSave.status !== 'on') return;
@@ -405,18 +429,15 @@ async function fileReconnect() {
 function updateSaveBadge() {
   const t = $('save-text'), d = $('save-dot'); if (!t) return;
   let txt, cls = '';
-  if (Cloud.on) txt = 'Live cloud';
-  else if (Cloud.configured) { txt = 'Cloud offline'; cls = 'bad'; }
-  else if (Store.caps.local || Store.caps.idb) txt = lastSaveTime ? 'Saved ' + clock(lastSaveTime) : 'Ready';
-  else { txt = 'Reload-only save'; cls = 'warn'; }
-  if (FileSave.handle && FileSave.status === 'on') txt += ' + file';
+  if (Cloud.configured) { if (Cloud.on) txt = 'Synced to all devices'; else if (Cloud.error) { txt = 'Cloud error'; cls = 'bad'; } else { txt = 'Connecting…'; cls = 'warn'; } }
+  else { txt = 'This device only'; cls = 'warn'; }
   t.textContent = txt; d.className = 'dot ' + cls;
 }
-function persistSession() { try { sessionStorage.setItem('sc_ui', JSON.stringify({ view:ui.view, teacher:ui.teacher, activeStudentId:ui.activeStudentId })); } catch (e) {} }
+function persistSession() { try { sessionStorage.setItem('sc_ui', JSON.stringify({ view:ui.view, tab:ui.tab, teacher:ui.teacher, activeStudentId:ui.activeStudentId })); } catch (e) {} }
 function restoreSession() {
   try {
     const o = JSON.parse(sessionStorage.getItem('sc_ui') || 'null'); if (!o) return;
-    ui.teacher = !!o.teacher;
+    ui.teacher = !!o.teacher; ui.tab = o.tab || 'roster';
     if (o.activeStudentId && state.students.some(s => s.id === o.activeStudentId)) ui.activeStudentId = o.activeStudentId;
     let v = o.view || 'leaderboard';
     if (v === 'teacher-dashboard' && !ui.teacher) v = 'leaderboard';
@@ -433,7 +454,7 @@ function initBackground() {
   try {
     const reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
     const renderer = new THREE.WebGLRenderer({ canvas:$('bg3d'), alpha:true, antialias:true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(60, 1, .1, 100); camera.position.z = 8;
     scene.add(new THREE.AmbientLight(0xffffff, .6));
     const dl = new THREE.DirectionalLight(0xffffff, .9); dl.position.set(4, 6, 8); scene.add(dl);
@@ -444,7 +465,7 @@ function initBackground() {
     shape.closePath();
     const starGeo = new THREE.ExtrudeGeometry(shape, { depth:.35, bevelEnabled:true, bevelThickness:.1, bevelSize:.08, bevelSegments:3 }); starGeo.center();
     const geos = [starGeo, new THREE.TorusGeometry(.6, .22, 12, 28), new THREE.OctahedronGeometry(.7), new THREE.IcosahedronGeometry(.6)];
-    const colors = [0xfdcb6e, 0xfd79a8, 0x6c5ce7, 0x00cec9, 0x74b9ff, 0xff7675], meshes = [], count = reduced ? 14 : 30;
+    const colors = [0xfdcb6e, 0xfd79a8, 0x6c5ce7, 0x00cec9, 0x74b9ff, 0xff7675], meshes = [], count = reduced ? 12 : 24;
     for (let i = 0; i < count; i++) {
       const g = i % 2 === 0 ? geos[0] : geos[1 + (i % 3)], col = colors[i % colors.length];
       const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color:col, metalness:.35, roughness:.3, emissive:col, emissiveIntensity:.18 }));
@@ -453,7 +474,7 @@ function initBackground() {
       m.userData = { rx:(Math.random() - .5) * .02, ry:(Math.random() - .5) * .03, fy:Math.random() * 6, sp:.3 + Math.random() * .6, baseY:m.position.y };
       scene.add(m); meshes.push(m);
     }
-    const n = reduced ? 150 : 420, arr = new Float32Array(n * 3);
+    const n = reduced ? 120 : 320, arr = new Float32Array(n * 3);
     for (let i = 0; i < n * 3; i += 3) { arr[i] = (Math.random() - .5) * 40; arr[i + 1] = (Math.random() - .5) * 24; arr[i + 2] = -Math.random() * 18; }
     const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(arr, 3));
     const pts = new THREE.Points(pg, new THREE.PointsMaterial({ color:0xffffff, size:.045, transparent:true, opacity:.7 })); scene.add(pts);
@@ -497,16 +518,17 @@ window.addEventListener('unhandledrejection', e => showFatal((e.reason && e.reas
 async function boot() {
   document.querySelectorAll('[data-ic]').forEach(e => { e.innerHTML = ic(e.dataset.ic, 16); });
   await Store.init();
+  resolveCloudConfig();
   const saved = await Store.load();
   if (saved) applyData(saved);
   if (!state.currentQrToken) state.currentQrToken = newCode();
   await fileInit();
   restoreSession(); initBackground(); bindFx();
-  updateNav(); renderView(ui.view);
-  if (!saved) saveState(); else { lastSaveTime = state.savedAt || Date.now(); updateSaveBadge(); }
+  updateNav(); renderView(ui.view); updateSaveBadge();
+  if (!saved && !Cloud.configured) saveState(); else if (saved) lastSaveTime = state.savedAt || Date.now();
   if (Cloud.configured) connectCloud();
   window.addEventListener('storage', e => {
-    if (e.key !== Store.KEY || !e.newValue || Cloud.on) return;
+    if (e.key !== Store.KEY || !e.newValue || Cloud.configured) return;
     const o = Store.parse(e.newValue);
     if (o && (o.savedAt || 0) > state.savedAt) { applyData(o); updateSaveBadge(); softRerender(); }
   });
@@ -514,24 +536,37 @@ async function boot() {
 window.addEventListener('DOMContentLoaded', boot);
 
 async function connectCloud() {
-  if (!window.CloudInit) { Cloud.error = 'Cloud engine blocked on this network'; updateSaveBadge(); return; }
-  const ok = await window.CloudInit(FIREBASE_CONFIG, CLASS_ROOM, (exists, data, err) => {
+  if (!window.CloudInit) { Cloud.error = 'cloud engine blocked'; updateSaveBadge(); softRerender(); return; }
+  await window.CloudInit(Cloud.cfg, Cloud.room, (exists, data, err) => {
+    const wasOn = Cloud.on;
     Cloud.on = !err; Cloud.exists = exists; Cloud.error = err || null;
-    if (exists && data && data.savedAt !== state.savedAt) { applyData(data); Store.save(getPayload()); lastSaveTime = Date.now(); scheduleFileWrite(); softRerender(); }
+    let changed = false;
+    if (exists && data && data.savedAt !== state.savedAt) { applyData(data); Store.save(getPayload()); lastSaveTime = Date.now(); scheduleFileWrite(); changed = true; }
     updateSaveBadge(); refreshSaveCenter();
+    if (Cloud.on && !exists && ui.teacher && !Cloud.pub) { Cloud.pub = true; publishToCloud(); }
+    if (changed || wasOn !== Cloud.on) softRerender();
   });
-  if (!ok) { Cloud.on = false; updateSaveBadge(); }
+  if (!Cloud.on) { updateSaveBadge(); softRerender(); }
 }
 async function publishToCloud() {
   if (!window.CloudPublish || !Cloud.on) { showToast('Cloud is not connected.', 'error'); return; }
-  try { await window.CloudPublish(getPayload()); showToast('Your class is now live in the cloud!', 'success'); } catch (e) { showToast('Could not publish: ' + e.message, 'error'); }
+  try { await window.CloudPublish(getPayload()); Cloud.exists = true; showToast('Your class is now live on every device!', 'success'); refreshSaveCenter(); }
+  catch (e) { showToast('Could not publish: ' + (e.code || e.message), 'error'); }
 }
 
 function softRerender() {
   if (ui.projector) renderProjector();
   if ($('modal').classList.contains('open')) return;
-  if (['leaderboard', 'student-dashboard', 'student-shop'].includes(ui.view)) renderView(ui.view);
-  else if (ui.view === 'teacher-dashboard') refreshTeacherLists();
+  const v = ui.view;
+  if (['leaderboard', 'student-dashboard', 'student-shop'].includes(v)) {
+    const sc = Array.from(document.querySelectorAll('.scroll')).map(e => e.scrollTop);
+    renderView(v, true);
+    document.querySelectorAll('.scroll').forEach((e, i) => { if (sc[i]) e.scrollTop = sc[i]; });
+  } else if (v === 'teacher-dashboard') refreshTeacherLists();
+  else if (v === 'student-login') {
+    const a = $('login-name-input'), b = $('login-pin-input');
+    if (!(a && a.value) && !(b && b.value)) renderView('student-login', true);
+  }
 }
 function killScanner() { if (html5QrScanner) { try { const p = html5QrScanner.clear(); if (p && p.catch) p.catch(() => {}); } catch (e) {} html5QrScanner = null; } }
 function updateNav() {
@@ -542,9 +577,10 @@ function switchView(name) { killScanner(); closeProjector(); ui.view = name; per
 function openStudent() { switchView(ui.activeStudentId && activeStudent() ? 'student-dashboard' : 'student-login'); }
 function openTeacher() { switchView(ui.teacher ? 'teacher-dashboard' : 'teacher-auth'); }
 function lockTeacher() { ui.teacher = false; switchView('leaderboard'); showToast('Teacher Hub locked', 'info'); }
+function setTab(t) { ui.tab = t; persistSession(); renderView('teacher-dashboard'); }
 
-function renderView(name) {
-  const c = $('app-content');
+function renderView(name, quiet) {
+  const c = $('app-content'); c.classList.toggle('quiet', !!quiet);
   try {
     switch (name) {
       case 'leaderboard': c.innerHTML = renderLeaderboardView(); break;
@@ -558,24 +594,25 @@ function renderView(name) {
         c.innerHTML = renderTeacherDashboardView(); setTimeout(renderTeacherQrCanvas, 40); break;
       default: c.innerHTML = renderLeaderboardView();
     }
-    postRender();
+    postRender(quiet);
   } catch (e) { console.error(e); showFatal('Could not draw "' + name + '": ' + e.message); }
 }
-function postRender() {
+function postRender(quiet) {
   document.querySelectorAll('[data-ic]').forEach(e => { if (!e.innerHTML) e.innerHTML = ic(e.dataset.ic, +e.dataset.s || 16); });
   document.querySelectorAll('[data-count]').forEach(el => {
-    const to = +el.dataset.count || 0, t0 = performance.now();
+    const to = +el.dataset.count || 0; if (quiet) { el.textContent = to; return; }
+    const t0 = performance.now();
     (function step(t) { const p = Math.min(1, (t - t0) / 800); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(step); })(t0);
   });
-  requestAnimationFrame(() => requestAnimationFrame(() => document.querySelectorAll('[data-w]').forEach(el => { el.style.width = el.dataset.w + '%'; })));
+  if (quiet) document.querySelectorAll('[data-w]').forEach(el => { el.style.transition = 'none'; el.style.width = el.dataset.w + '%'; });
+  else requestAnimationFrame(() => requestAnimationFrame(() => document.querySelectorAll('[data-w]').forEach(el => { el.style.width = el.dataset.w + '%'; })));
+}
+function connNotice() {
+  if (!Cloud.configured || Cloud.on) return '';
+  return Cloud.error ? `<div class="notice bad">Cannot reach the class right now (${esc(Cloud.error)}). Check the internet and refresh the page.</div>` : '<div class="notice">Connecting to your class…</div>';
 }
 
 /* ===== views ===== */
-function coinHTML() {
-  let l = '';
-  for (let i = -6; i <= 6; i++) { const edge = Math.abs(i) < 6; l += `<i style="transform:translateZ(${i}px)${i === -6 ? ' rotateY(180deg)' : ''};${edge ? 'filter:brightness(.62)' : ''}">${edge ? '' : '★'}</i>`; }
-  return `<div class="coin-wrap"><div class="coin">${l}</div></div>`;
-}
 function podiumHTML(top3) {
   const cfg = [{ i:1, cls:'p2', h:150, label:'2nd' }, { i:0, cls:'p1', h:195, label:'1st' }, { i:2, cls:'p3', h:120, label:'3rd' }];
   const cols = cfg.map(c => {
@@ -596,22 +633,21 @@ function standingRow(s, rank, leader) {
 function renderLeaderboardView() {
   const sorted = getSortedStudents(), top3 = sorted.slice(0, 3), leader = sorted.length ? sorted[0].totalEarned : 0, mult = state.settings.multiplier || 1;
   return `<div class="stack">
-    <div class="tc">${coinHTML()}<span class="chip gold">🔥 LIVE CLASS STANDINGS</span>
-      <h2 class="hero-title disp neon mt8">Class Leaderboard</h2>
+    ${connNotice()}
+    <div class="tc"><h2 class="hero-title disp neon">Class Leaderboard</h2>
       <p class="muted small mt8">Scan codes, hit goals, climb the ranks. Lifetime stars decide your rank!</p>
-      <div class="flex jc gap8 fw mt16"><button class="btn slate" onclick="openProjector('board')"><span data-ic="cast"></span>Projector Mode</button></div></div>
-    ${mult > 1 ? `<div class="card gold-b tc disp b gold" style="font-size:22px">⚡ ${mult}× STAR POWER IS ON! Every scan = +${mult} stars ⚡</div>` : ''}
-    ${state.students.length === 0 ? `<div class="card tc" style="max-width:440px;margin:0 auto"><div style="font-size:52px">📋</div><h3 class="ctitle mt8">No students yet</h3><p class="muted small mt8">Ask your teacher to add students in the Teacher Hub.</p><button class="btn purple mt16" onclick="openTeacher()">Open Teacher Hub</button></div>` : `
+      <div class="mt16"><button class="btn slate sm" onclick="openProjector('board')"><span data-ic="cast"></span>Projector Mode</button></div></div>
+    ${mult > 1 ? `<div class="card gold-b tc disp b gold" style="font-size:21px">⚡ ${mult}× STAR POWER IS ON! Every scan = +${mult} stars ⚡</div>` : ''}
+    ${state.students.length === 0 ? `<div class="card tc" style="max-width:440px;margin:0 auto"><div style="font-size:48px">📋</div><h3 class="ctitle mt8">No students yet</h3><p class="muted small mt8">Ask your teacher to add students in the Teacher Hub.</p><button class="btn purple mt16" onclick="openTeacher()">Open Teacher Hub</button></div>` : `
       ${podiumHTML(top3)}
       <div class="cols-main">
-        <div class="card"><div class="flex jb ac"><h3 class="ctitle disp">Full Standings</h3><span class="tiny">${sorted.length} students</span></div>
-          <div class="scroll mt16" style="max-height:560px;display:grid;gap:9px">${sorted.map((s, i) => standingRow(s, i + 1, leader)).join('')}</div></div>
+        <div class="card"><div class="flex jb ac"><h3 class="ctitle disp">Standings</h3><span class="tiny">${sorted.length} students</span></div>
+          <div class="scroll mt16" style="max-height:560px;display:grid;gap:8px">${sorted.map((s, i) => standingRow(s, i + 1, leader)).join('')}</div></div>
         <div class="card"><h3 class="ctitle disp">⚡ Live Activity</h3>
           <div class="scroll mt16" style="max-height:560px;display:grid;gap:8px">${state.activity.length === 0 ? '<p class="tiny">Nothing yet. Be the first to scan a code!</p>' : state.activity.map(a => `<div class="feed"><span style="font-size:18px">${a.icon}</span><div><div>${esc(a.msg)}</div><div class="tiny">${clock(a.t)}</div></div></div>`).join('')}</div></div>
       </div>`}</div>`;
 }
 
-/* projector mode (works inside any editor, no fullscreen permission needed) */
 function openProjector(mode) {
   ui.projector = { mode:(mode === 'qr' && ui.teacher) ? 'qr' : 'board' };
   $('projector').classList.remove('hide'); renderProjector();
@@ -628,20 +664,16 @@ function renderProjector() {
   const bar = `<div class="proj-bar"><div class="flex gap8">${ui.teacher ? `<button class="btn sm ${mode === 'board' ? 'purple' : 'slate'}" onclick="setProjectorMode('board')">Leaderboard</button><button class="btn sm ${mode === 'qr' ? 'purple' : 'slate'}" onclick="setProjectorMode('qr')">Scan Code</button>` : ''}</div>
     <button class="btn sm red" onclick="closeProjector()"><span data-ic="x"></span>Exit (Esc)</button></div>`;
   if (mode === 'qr') {
-    p.innerHTML = `<div class="proj">${bar}
-      <h1 class="proj-title disp neon">Scan to earn ⭐${mult > 1 ? ' ×' + mult : ''}</h1>
+    p.innerHTML = `<div class="proj">${bar}<h1 class="proj-title disp neon">Scan to earn ⭐${mult > 1 ? ' ×' + mult : ''}</h1>
       <div class="proj-qr"><div class="qr-board"><div id="proj-qr"></div></div>
-        <div class="tc"><div class="tiny up" style="font-size:16px">No camera? Type this code</div><div class="bigcode">${esc(state.currentQrToken)}</div>
-          <div class="tiny mt8" style="font-size:14px">The code changes after every scan</div></div></div></div>`;
-    const size = Math.floor(Math.min(window.innerHeight * .5, window.innerWidth * .7, 420));
-    drawQR($('proj-qr'), state.currentQrToken, size);
+        <div class="tc"><div class="tiny up" style="font-size:16px">No camera? Type this code</div><div class="bigcode">${esc(state.currentQrToken)}</div><div class="tiny mt8" style="font-size:14px">The code changes after every scan</div></div></div></div>`;
+    drawQR($('proj-qr'), state.currentQrToken, Math.floor(Math.min(window.innerHeight * .5, window.innerWidth * .7, 420)));
   } else {
-    const rest = sorted.slice(3, 13);
     p.innerHTML = `<div class="proj">${bar}<h1 class="proj-title disp neon">🏆 Class Leaderboard</h1>
       ${sorted.length ? podiumHTML(sorted.slice(0, 3)) : '<p class="tc muted mt24">No students yet.</p>'}
-      <div class="proj-grid">${rest.map((s, i) => standingRow(s, i + 4, leader)).join('')}</div></div>`;
+      <div class="proj-grid">${sorted.slice(3, 13).map((s, i) => standingRow(s, i + 4, leader)).join('')}</div></div>`;
   }
-  postRender();
+  postRender(true);
 }
 function drawQR(el, text, size) {
   if (!el) return; el.innerHTML = '';
@@ -652,12 +684,13 @@ function drawQR(el, text, size) {
 function renderStudentLoginView() {
   const sorted = [...state.students].sort((a, b) => a.name.localeCompare(b.name));
   return `<div style="max-width:460px;margin:0 auto" class="stack">
-    <div class="tc"><div style="font-size:54px">🎒</div><h2 class="hero-title disp neon" style="font-size:44px">Student Login</h2><p class="muted small mt8">Enter your name and the 6-character PIN from your teacher.</p></div>
-    <div class="card tilt" data-tilt="4"><form onsubmit="handleStudentPinLogin(event)" class="stack" style="--x:0">
-      <div><label class="lbl">Your Full Name</label><input class="field" id="login-name-input" required autocomplete="off" placeholder="e.g. Alex Smith"></div>
+    ${connNotice()}
+    <div class="tc"><div style="font-size:50px">🎒</div><h2 class="hero-title disp neon" style="font-size:40px">Student Login</h2><p class="muted small mt8">Enter your name and the 6-character PIN from your teacher.</p></div>
+    <div class="card tilt" data-tilt="4"><form onsubmit="handleStudentPinLogin(event)" class="stack">
+      <div><label class="lbl">Your Name</label><input class="field" id="login-name-input" required autocomplete="off" placeholder="e.g. Alex S"></div>
       <div><label class="lbl">6-Character PIN</label><input class="field mono up" id="login-pin-input" required maxlength="6" autocomplete="off" placeholder="A8X29K" style="letter-spacing:.2em"></div>
       <button class="btn purple lg block" type="submit">Enter Student Portal 🚀</button></form></div>
-    ${sorted.length ? `<div><div class="tc tiny up b mb">Find your name</div><input class="field mt8" placeholder="Search names…" oninput="filterLogin(this.value)">
+    ${sorted.length ? `<div><div class="tc tiny up b">Find your name</div><input class="field mt8" placeholder="Search names…" oninput="filterLogin(this.value)">
       <div class="scroll mt12" id="login-list" style="max-height:230px;display:grid;gap:7px">${sorted.map(s => `<button onclick="fillStudentLogin('${esc(s.id)}')" data-name="${esc(s.name.toLowerCase())}" class="srow" style="cursor:pointer;color:#fff;text-align:left;width:100%"><span class="av" style="font-size:22px">${s.avatar}</span><span class="f1 sname">${esc(s.name)}</span><span class="tiny">Rank #${getStudentRank(s.id)}</span></button>`).join('')}</div></div>` : ''}</div>`;
 }
 function filterLogin(v) { v = v.trim().toLowerCase(); document.querySelectorAll('#login-list [data-name]').forEach(b => { b.style.display = b.dataset.name.includes(v) ? '' : 'none'; }); }
@@ -672,18 +705,18 @@ function renderStudentDashboardView() {
     <div class="flex jb ac fw gap8"><button class="btn slate sm" onclick="studentLogout()"><span data-ic="back"></span>Switch Account</button><span class="chip">Your PIN: <span class="mono gold">${esc(s.pin)}</span></span></div>
     <div class="card tilt" data-tilt="5">
       <div class="flex ac gap24 fw jc">
-        <button onclick="openAvatarPicker()" title="Change avatar" class="lift" style="width:104px;height:104px;border-radius:30px;font-size:54px;background:#1b1740;border:3px solid #a78bfa;box-shadow:0 0 34px rgba(167,139,250,.6);cursor:pointer">${s.avatar}</button>
+        <button onclick="openAvatarPicker()" title="Change avatar" class="lift" style="width:100px;height:100px;border-radius:28px;font-size:52px;background:#1b1740;border:3px solid #a78bfa;box-shadow:0 0 30px rgba(167,139,250,.5);cursor:pointer">${s.avatar}</button>
         <div class="f1" style="min-width:230px"><span class="chip">RANK #${rank} OF ${state.students.length}</span>
-          <h2 class="disp mt8" style="font-size:38px;font-weight:700">${esc(s.name)}</h2>
+          <h2 class="disp mt8" style="font-size:36px;font-weight:700">${esc(s.name)}</h2>
           <p class="small" style="color:#c7c2f5">${rank === 1 ? '👑 You are leading the class!' : gap + ' lifetime stars behind 1st place'}</p>
           <div class="mt12"><div class="flex jb tiny b" style="margin-bottom:5px"><span class="gold">${lv.cur.icon} ${lv.cur.name}</span><span>${lv.next ? lv.toNext + ' to ' + lv.next.icon + ' ' + lv.next.name : 'MAX LEVEL!'}</span></div><div class="xp"><i data-w="${lv.pct}"></i></div></div></div></div>
       <div class="cols-2 mt16"><div class="box"><div class="tiny up b">Spendable</div><div class="bignum gold">⭐ <span data-count="${s.stars}">0</span></div></div>
         <div class="box"><div class="tiny up b">Lifetime</div><div class="bignum pinkc">🏅 <span data-count="${s.totalEarned}">0</span></div></div></div></div>
     <div class="cols-2">
-      <button class="tile tilt" data-tilt="12" onclick="switchView('student-scanner')" style="background:linear-gradient(135deg,#6c5ce7,#4338ca);box-shadow:0 8px 0 #2e2680,0 18px 30px rgba(0,0,0,.4)"><div class="lift" style="font-size:42px">📷</div><h3 class="disp mt8" style="font-size:22px">Scan Teacher Code</h3><p class="small" style="color:#c7d2fe">Scan the QR (or type the code) to earn stars!</p></button>
-      <button class="tile tilt" data-tilt="12" onclick="switchView('student-shop')" style="background:linear-gradient(135deg,#fd79a8,#e11d48);box-shadow:0 8px 0 #9f1239,0 18px 30px rgba(0,0,0,.4)"><div class="lift" style="font-size:42px">🎁</div><h3 class="disp mt8" style="font-size:22px">Prize Shop</h3><p class="small" style="color:#ffe4e6">Spend stars on passes and perks!</p></button></div>
-    <div class="card"><div class="flex jb ac"><h3 class="ctitle disp">🔥 Live Top 5</h3><button class="btn slate sm" onclick="switchView('leaderboard')">Full Leaderboard</button></div>
-      <div style="display:grid;gap:8px" class="mt16">${top5.map((x, i) => `<div class="srow" style="${x.id === s.id ? 'background:rgba(108,92,231,.3);border-color:#6c5ce7' : ''}"><div class="rank r${Math.min(i + 1, 4)}">#${i + 1}</div><div class="av" style="font-size:22px">${x.avatar}</div><div class="f1 sname">${esc(x.name)} ${x.id === s.id ? '(You)' : ''}</div><div class="starpill">⭐ ${x.totalEarned}</div></div>`).join('')}</div></div>
+      <button class="tile tilt" data-tilt="12" onclick="switchView('student-scanner')" style="background:linear-gradient(135deg,#6c5ce7,#4338ca);box-shadow:0 6px 0 #2e2680,0 14px 26px rgba(0,0,0,.4)"><div class="lift" style="font-size:40px">📷</div><h3 class="disp mt8" style="font-size:21px">Scan Teacher Code</h3><p class="small" style="color:#c7d2fe">Scan the QR (or type the code) to earn stars!</p></button>
+      <button class="tile tilt" data-tilt="12" onclick="switchView('student-shop')" style="background:linear-gradient(135deg,#fd79a8,#e11d48);box-shadow:0 6px 0 #9f1239,0 14px 26px rgba(0,0,0,.4)"><div class="lift" style="font-size:40px">🎁</div><h3 class="disp mt8" style="font-size:21px">Prize Shop</h3><p class="small" style="color:#ffe4e6">Spend stars on passes and perks!</p></button></div>
+    <div class="card"><div class="flex jb ac"><h3 class="ctitle disp">🔥 Top 5</h3><button class="btn slate sm" onclick="switchView('leaderboard')">Full Leaderboard</button></div>
+      <div style="display:grid;gap:8px" class="mt16">${top5.map((x, i) => `<div class="srow" style="${x.id === s.id ? 'background:rgba(108,92,231,.28);border-color:#6c5ce7' : ''}"><div class="rank r${Math.min(i + 1, 4)}">#${i + 1}</div><div class="av" style="font-size:22px">${x.avatar}</div><div class="f1 sname">${esc(x.name)} ${x.id === s.id ? '(You)' : ''}</div><div class="starpill">⭐ ${x.totalEarned}</div></div>`).join('')}</div></div>
     ${mine.length ? `<div class="card"><h3 class="ctitle disp">🎟️ My Prize Claims</h3><div style="display:grid;gap:8px" class="mt12">${mine.map(r => `<div class="feed flex jb"><span>${esc(r.icon)} ${esc(r.title)}</span><b style="color:${r.done ? '#34d399' : '#fbbf24'}">${r.done ? 'Given ✓' : 'Waiting for teacher'}</b></div>`).join('')}</div></div>` : ''}</div>`;
 }
 function studentLogout() { ui.activeStudentId = null; switchView('student-login'); }
@@ -697,8 +730,8 @@ async function setAvatar(a) {
 function renderStudentScannerView() {
   return `<div style="max-width:480px;margin:0 auto" class="stack">
     <button class="btn slate sm" onclick="switchView('student-dashboard')"><span data-ic="back"></span>Back</button>
-    <div class="tc"><h2 class="hero-title disp neon" style="font-size:40px">Scan for Stars 📷</h2><p class="muted small mt8">Point your camera at the teacher's QR code.</p></div>
-    <div class="card"><div id="reader" class="small muted" style="border-radius:16px;overflow:hidden"></div></div>
+    <div class="tc"><h2 class="hero-title disp neon" style="font-size:38px">Scan for Stars 📷</h2><p class="muted small mt8">Point your camera at the teacher's QR code.</p></div>
+    <div class="card"><div id="reader" class="small muted" style="border-radius:14px;overflow:hidden"></div></div>
     <div class="card"><label class="lbl">No camera? Type the 6-character code on the screen:</label>
       <input class="field mono up" id="manual-token-input" maxlength="8" placeholder="K7Q2MX" style="letter-spacing:.25em;font-size:20px;text-align:center" onkeydown="if(event.key==='Enter')submitManualToken()">
       <button class="btn green lg block mt12" onclick="submitManualToken()">Claim My Star ⭐</button></div></div>`;
@@ -718,7 +751,7 @@ function renderStudentShopView() {
   if (!s) { setTimeout(() => switchView('student-login'), 0); return ''; }
   return `<div style="max-width:1000px;margin:0 auto" class="stack">
     <div class="flex jb ac"><button class="btn slate sm" onclick="switchView('student-dashboard')"><span data-ic="back"></span>Dashboard</button><span class="btn goldb sm" style="cursor:default">⭐ Balance: ${s.stars}</span></div>
-    <div class="tc"><h2 class="hero-title disp neon" style="font-size:46px">Prize Shop 🎁</h2><p class="muted small mt8">Spend your stars. Spending won't hurt your rank!</p></div>
+    <div class="tc"><h2 class="hero-title disp neon" style="font-size:42px">Prize Shop 🎁</h2><p class="muted small mt8">Spend your stars. Spending won't hurt your rank!</p></div>
     <div class="cols-3">${state.prizes.map(p => {
       const can = s.stars >= p.cost, stock = p.stock > 0;
       return `<div class="card tilt" data-tilt="14" style="display:flex;flex-direction:column;justify-content:space-between"><div><div class="prize-ic">${esc(p.icon)}</div><h3 class="ctitle disp tc">${esc(p.title)}</h3><p class="tiny tc mt8">${esc(p.description)}</p></div>
@@ -728,92 +761,147 @@ function renderStudentShopView() {
 }
 
 function renderTeacherAuthView() {
-  return `<div style="max-width:430px;margin:20px auto"><div class="card tc tilt" data-tilt="6"><div style="width:68px;height:68px;border-radius:20px;margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:32px;background:rgba(108,92,231,.25);border:1px solid rgba(108,92,231,.5)">🔒</div>
-    <h2 class="hero-title disp neon mt12" style="font-size:40px">Teacher Lock</h2><p class="muted small mt8">Enter the teacher password to open the controls.</p>
+  return `<div style="max-width:420px;margin:20px auto"><div class="card tc"><div style="width:64px;height:64px;border-radius:18px;margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:30px;background:rgba(108,92,231,.22);border:1px solid rgba(108,92,231,.5)">🔒</div>
+    <h2 class="hero-title disp neon mt12" style="font-size:36px">Teacher Lock</h2><p class="muted small mt8">Enter the teacher password to open the controls.</p>
     <form onsubmit="handleTeacherLogin(event)" class="mt16"><input class="field mono tc" type="password" id="teacher-password-input" placeholder="Password" required style="font-size:18px;letter-spacing:.2em">
-    <button class="btn purple lg block mt12" type="submit">Unlock Dashboard</button></form></div></div>`;
+    <button class="btn purple lg block mt12" type="submit">Unlock</button></form></div></div>`;
 }
 
+/* ----- teacher: roster, prizes, claims ----- */
 function rosterHTML() {
   const list = getSortedStudents();
-  if (!list.length) return '<div class="tc tiny" style="padding:36px;border:1px dashed var(--line);border-radius:18px">No students yet. Use "Bulk Add" to paste your class list!</div>';
+  if (!list.length) return '<div class="tc tiny" style="padding:36px;border:1px dashed var(--line);border-radius:16px">No students yet. Press "Bulk Add" and paste your class list!</div>';
   return list.map((st, idx) => `<div class="roster-row srow fw" data-name="${esc(st.name.toLowerCase())}"><div class="rank">#${idx + 1}</div><div class="av" style="font-size:22px">${st.avatar}</div>
     <div class="f1" style="min-width:150px"><div class="sname">${esc(st.name)}</div><div class="tiny"><b class="gold">⭐ ${st.stars}</b> · lifetime ${st.totalEarned} · PIN <b class="mono" style="color:#a5b4fc">${esc(st.pin)}</b></div></div>
     <div class="flex gap4"><button class="btn green sm" onclick="teacherAdjustStars('${esc(st.id)}',1)">+1</button><button class="btn blue sm" onclick="teacherAdjustStars('${esc(st.id)}',5)">+5</button><button class="btn red sm" onclick="teacherAdjustStars('${esc(st.id)}',-1)">-1</button>
     <button class="btn slate sm" title="New PIN" onclick="resetPin('${esc(st.id)}')"><span data-ic="key" data-s="14"></span></button><button class="btn slate sm" title="Remove" onclick="deleteStudent('${esc(st.id)}')"><span data-ic="trash" data-s="14"></span></button></div></div>`).join('');
 }
 function prizesHTML() {
-  return state.prizes.map(p => `<div class="srow"><div class="av" style="font-size:24px">${esc(p.icon)}</div><div class="f1"><div class="sname trunc" style="font-size:13px">${esc(p.title)}</div><div class="tiny"><b class="gold">⭐ ${p.cost}</b> · Stock ${p.stock}</div></div>
+  return state.prizes.map(p => `<div class="srow"><div class="av" style="font-size:24px">${esc(p.icon)}</div><div class="f1"><div class="sname trunc" style="font-size:13.5px">${esc(p.title)}</div><div class="tiny"><b class="gold">⭐ ${p.cost}</b> · Stock ${p.stock}</div></div>
     <div class="flex gap4"><button class="btn slate sm" onclick="adjustStock('${esc(p.id)}',-1)">-</button><button class="btn slate sm" onclick="adjustStock('${esc(p.id)}',1)">+</button><button class="btn slate sm" onclick="deletePrize('${esc(p.id)}')"><span data-ic="trash" data-s="14"></span></button></div></div>`).join('') || '<p class="tiny">No prizes yet.</p>';
 }
 function claimsHTML() {
   const list = [...state.redemptions].sort((a, b) => (a.done - b.done) || (b.t - a.t)).slice(0, 40);
   if (!list.length) return '<p class="tiny">No claims yet.</p>';
-  return list.map(r => `<div class="srow" style="${r.done ? '' : 'border-color:rgba(251,191,36,.5)'}"><div class="f1"><div class="sname" style="font-size:13px">${esc(r.icon)} ${esc(r.title)}</div><div class="tiny">${esc(r.name)} · ${clock(r.t)}</div></div>
+  return list.map(r => `<div class="srow" style="${r.done ? '' : 'border-color:rgba(251,191,36,.5)'}"><div class="f1"><div class="sname" style="font-size:13.5px">${esc(r.icon)} ${esc(r.title)}</div><div class="tiny">${esc(r.name)} · ${clock(r.t)}</div></div>
     <button class="btn ${r.done ? 'slate' : 'green'} sm" onclick="toggleClaim('${esc(r.id)}')">${r.done ? 'Undo' : 'Mark Given'}</button></div>`).join('');
 }
-function saveCenterHTML() {
-  const fileTxt = !FileSave.supported ? 'Not available in this browser' : FileSave.handle ? (FileSave.status === 'on' ? 'Linked, auto-saving' : 'Needs permission') : 'Not linked';
-  const fileCls = FileSave.handle && FileSave.status === 'on' ? '' : 'warn';
-  const cloudTxt = Cloud.on ? (Cloud.exists ? 'Live: students sync here' : 'Connected, class not published') : Cloud.configured ? 'Cannot connect' : 'Not set up (this device only)';
-  const cloudCls = Cloud.on && Cloud.exists ? '' : (Cloud.configured ? 'bad' : 'warn');
-  return `<div class="flex fw gap8 ac">
-      <span class="pill-status"><i class="dot ${(Store.caps.local || Store.caps.idb) ? '' : 'warn'}"></i>This device: ${(Store.caps.local || Store.caps.idb) ? 'saving' : 'reload-only'}</span>
-      <span class="pill-status"><i class="dot ${fileCls}"></i>File on my computer: ${fileTxt}</span>
-      <span class="pill-status"><i class="dot ${cloudCls}"></i>Student devices: ${cloudTxt}</span></div>
-    <div class="flex fw gap8 mt12">
-      ${FileSave.handle && FileSave.status !== 'on' ? `<button class="btn goldb sm" onclick="fileReconnect()"><span data-ic="folder"></span>Reconnect save file</button>` : `<button class="btn green sm" onclick="fileLink()"><span data-ic="folder"></span>${FileSave.handle ? 'Pick a different file' : 'Save to my computer'}</button>`}
-      ${Cloud.on && !Cloud.exists ? `<button class="btn pink sm" onclick="publishToCloud()"><span data-ic="cloud"></span>Publish class to cloud</button>` : ''}
-      <button class="btn blue sm" onclick="openSaveModal(true)"><span data-ic="cloud"></span>Save &amp; Connect help</button></div>`;
+function rosterTabHTML() {
+  return `<div class="card"><div class="flex jb ac fw gap8"><h3 class="ctitle disp">Roster &amp; PINs</h3>
+    <div class="flex fw gap8"><input class="field" id="roster-search" style="width:160px;padding:8px 11px" placeholder="Search…" oninput="filterRoster(this.value)">
+      <button class="btn slate sm" onclick="promptSingleStudent()"><span data-ic="plus"></span>Add One</button><button class="btn purple sm" onclick="openBulkStudentModal()"><span data-ic="users"></span>Bulk Add</button><button class="btn blue sm" onclick="openPinList()"><span data-ic="list"></span>PIN List</button></div></div>
+    <div id="roster-list" class="scroll mt16" style="max-height:520px;display:grid;gap:8px">${rosterHTML()}</div></div>`;
 }
-function refreshSaveCenter() { const e = $('save-center'); if (e) { e.innerHTML = saveCenterHTML(); postRender(); } }
+function prizesTabHTML() {
+  return `<div class="cols-2" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));align-items:start">
+    <div class="card"><div class="flex jb ac"><h3 class="ctitle disp">Prize Store</h3><button class="btn pink sm" onclick="openAddPrizeModal()"><span data-ic="plus"></span>Add Prize</button></div><div id="prize-list" class="scroll mt16" style="max-height:480px;display:grid;gap:8px">${prizesHTML()}</div></div>
+    <div class="card"><h3 class="ctitle disp">🎟️ Prize Claims</h3><div id="claims-list" class="scroll mt16" style="max-height:480px;display:grid;gap:8px">${claimsHTML()}</div></div></div>`;
+}
+
+/* ----- teacher: cloud & backup tab ----- */
+function saveCenterHTML() {
+  const local = Store.caps.local || Store.caps.idb;
+  const pills = `<div class="flex fw gap8">
+    <span class="pill-status"><i class="dot ${Cloud.configured ? (Cloud.on ? '' : 'bad') : 'warn'}"></i>All devices: ${Cloud.configured ? (Cloud.on ? 'live' : (Cloud.error ? 'error' : 'connecting')) : 'not set up'}</span>
+    <span class="pill-status"><i class="dot ${local ? '' : 'warn'}"></i>This device: ${local ? 'saving' : 'reload-only'}</span></div>`;
+  let cloud;
+  if (Cloud.configured) {
+    const baked = 'const FIREBASE_CONFIG = ' + JSON.stringify(Cloud.cfg) + ';';
+    cloud = `${pills}
+      ${Cloud.error ? `<div class="notice bad mt12">Cloud error: <b>${esc(Cloud.error)}</b>.<br><span class="tiny">If it mentions permissions, open Firestore &rarr; Rules, paste the rules from the setup steps, and press Publish.</span></div>` : ''}
+      ${Cloud.on && !Cloud.exists ? `<div class="notice mt12 flex jb ac fw gap8"><span>Your class is not in the cloud yet.</span><button class="btn pink sm" onclick="publishToCloud()"><span data-ic="cloud"></span>Publish my class</button></div>` : ''}
+      <div class="mt16"><label class="lbl">A. Link for students (works right away on any device)</label>
+        <div class="flex gap8"><input class="field mono" id="student-link" readonly value="${esc(studentLink())}" style="font-size:11px"><button class="btn blue" onclick="copyText('student-link')"><span data-ic="copy"></span>Copy</button></div>
+        <p class="tiny mt8">Post this link in Google Classroom. A device that opens it once remembers the class.</p></div>
+      ${FIREBASE_CONFIG ? '<p class="tiny mt16">The plain website address already works for everyone (the config is built into this page).</p>' : `
+      <div class="mt16"><label class="lbl">B. Make the plain website address work for everyone (do once)</label>
+        <textarea class="field mono" id="baked-line" readonly rows="3" style="font-size:11px">${esc(baked)}</textarea>
+        <div class="flex gap8 mt8"><button class="btn blue sm" onclick="copyText('baked-line')"><span data-ic="copy"></span>Copy this line</button></div>
+        <p class="tiny mt8">On GitHub: open <b>index.html</b>, click the pencil icon, find <span class="mono">const FIREBASE_CONFIG = null;</span>, replace that whole line with the copied one, then <b>Commit changes</b>. After about a minute, anyone opening the site is on your class.</p></div>
+      <div class="mt16"><button class="btn slate sm" onclick="disconnectCloud()">Disconnect this device from the cloud</button></div>`}`;
+  } else {
+    cloud = `${pills}
+      <div class="notice mt12">Right now every device keeps its own separate data. Do this one-time setup (about 5 minutes, free) so every student device shares your class.</div>
+      <ol class="steps">
+        <li>Go to <b>console.firebase.google.com</b> and sign in with a Google account. Click <b>Create a project</b>, name it anything, and turn Google Analytics off.</li>
+        <li>In the left menu choose <b>Build &rarr; Firestore Database &rarr; Create database</b>. Pick any location, choose <b>Start in test mode</b>, and click Enable.</li>
+        <li>Open the <b>Rules</b> tab, replace everything with the text below, and press <b>Publish</b> (this keeps it working past 30 days).</li>
+      </ol>
+      <textarea class="field mono mt8" id="fb-rules" readonly rows="8" style="font-size:11px">${esc(RULES_TEXT)}</textarea>
+      <button class="btn blue sm mt8" onclick="copyText('fb-rules')"><span data-ic="copy"></span>Copy rules</button>
+      <ol class="steps" start="4">
+        <li>Click the <b>gear icon &rarr; Project settings</b>, scroll to <b>Your apps</b>, click the <b>&lt;/&gt;</b> (web) icon, and register an app with any name.</li>
+        <li>Copy the whole <b>firebaseConfig</b> block it shows, paste it here, and press Connect.</li>
+      </ol>
+      <textarea class="field mono mt8" id="fb-config-input" rows="7" style="font-size:12px" placeholder='const firebaseConfig = {&#10;  apiKey: "...",&#10;  authDomain: "...",&#10;  projectId: "...",&#10;  ...&#10;};'></textarea>
+      <button class="btn green lg block mt12" onclick="connectCloudWizard()"><span data-ic="cloud"></span>Connect</button>`;
+  }
+  const fileState = !FileSave.supported ? 'Not available in this browser' : FileSave.handle ? (FileSave.status === 'on' ? 'Linked, auto-saving' : 'Needs permission') : 'Not linked';
+  return `<div class="stack"><div class="card"><h3 class="ctitle disp">☁️ Share across all devices</h3><div class="mt12">${cloud}</div></div>
+    <div class="card"><h3 class="ctitle disp">💾 Backups</h3><p class="tiny mt8">Extra safety copies on your own computer. File saving: <b>${fileState}</b>.</p>
+      <div class="flex fw gap8 mt12">${FileSave.handle && FileSave.status !== 'on' ? `<button class="btn goldb sm" onclick="fileReconnect()"><span data-ic="folder"></span>Reconnect save file</button>` : `<button class="btn green sm" onclick="fileLink()"><span data-ic="folder"></span>${FileSave.handle ? 'Pick a different file' : 'Auto-save to a file'}</button>`}
+        <button class="btn blue sm" onclick="downloadBackup()"><span data-ic="download"></span>Download Backup</button><button class="btn slate sm" onclick="triggerImportFile()"><span data-ic="upload"></span>Restore from File</button></div></div></div>`;
+}
+function refreshSaveCenter() { const e = $('save-center'); if (e) { e.innerHTML = saveCenterHTML(); postRender(true); } }
 function refreshTeacherLists() {
-  const r = $('roster-list'); if (!r) return;
-  const sc = r.scrollTop; r.innerHTML = rosterHTML(); r.scrollTop = sc;
-  const rs = $('roster-search'); if (rs && rs.value) filterRoster(rs.value);
-  $('prize-list').innerHTML = prizesHTML(); $('claims-list').innerHTML = claimsHTML();
-  const c = $('roster-count'); if (c) c.textContent = state.students.length;
+  const r = $('roster-list');
+  if (r) { const sc = r.scrollTop; r.innerHTML = rosterHTML(); r.scrollTop = sc; const rs = $('roster-search'); if (rs && rs.value) filterRoster(rs.value); }
+  const p = $('prize-list'); if (p) p.innerHTML = prizesHTML();
+  const c = $('claims-list'); if (c) c.innerHTML = claimsHTML();
+  const rc = $('roster-count'); if (rc) rc.textContent = state.students.length;
   const pend = $('claims-pending'); if (pend) pend.textContent = state.redemptions.filter(x => !x.done).length;
   const l = $('teacher-token-label'); if (l && l.textContent !== state.currentQrToken) { l.textContent = state.currentQrToken; renderTeacherQrCanvas(); }
-  refreshSaveCenter(); postRender();
+  postRender(true);
 }
 function filterRoster(v) { v = v.trim().toLowerCase(); document.querySelectorAll('#roster-list .roster-row').forEach(r => { r.style.display = r.dataset.name.includes(v) ? '' : 'none'; }); }
 
 function renderTeacherDashboardView() {
-  const mult = state.settings.multiplier || 1;
+  const mult = state.settings.multiplier || 1, tab = ui.tab || 'roster', pend = state.redemptions.filter(x => !x.done).length;
+  const cdot = Cloud.configured ? (Cloud.on ? '' : 'bad') : 'warn';
+  const body = tab === 'prizes' ? prizesTabHTML() : tab === 'setup' ? `<div id="save-center">${saveCenterHTML()}</div>` : rosterTabHTML();
   return `<div class="stack">
-    <div class="card"><div class="flex jb ac fw gap16"><div><span class="chip">TEACHER HUB</span><h2 class="hero-title disp neon mt8" style="font-size:40px">Class Command Center</h2>
-      <p class="tiny mt8">Students: <b style="color:#fff" id="roster-count">${state.students.length}</b> · Prize claims waiting: <b class="gold" id="claims-pending">${state.redemptions.filter(x => !x.done).length}</b></p></div>
-      <div class="flex fw gap8"><button class="btn purple sm" onclick="openBulkStudentModal()"><span data-ic="users"></span>Bulk Add</button><button class="btn pink sm" onclick="openAddPrizeModal()"><span data-ic="gift"></span>Add Prize</button>
-        <button class="btn goldb sm" onclick="openPicker()"><span data-ic="dice"></span>Random Picker</button><button class="btn blue sm" onclick="openPinList()"><span data-ic="list"></span>PIN List</button>
-        <button class="btn slate sm" onclick="openSettings()"><span data-ic="sliders"></span>Settings</button><button class="btn slate sm" onclick="lockTeacher()"><span data-ic="lock"></span>Lock</button></div></div></div>
-    <div class="card"><h3 class="ctitle disp">💾 Where your data is saved</h3><div class="mt12" id="save-center">${saveCenterHTML()}</div></div>
-    <div class="card gold-b tc tilt" data-tilt="4" style="max-width:640px;margin-left:auto;margin-right:auto"><span class="chip gold">⚡ SINGLE-USE STAR DISPENSER</span>
-      <h3 class="ctitle disp mt8">Project this for students</h3><p class="small muted mt8">Each scan gives <b class="gold">+${mult} star${mult > 1 ? 's' : ''}</b>, then the code changes instantly.</p>
-      <div class="mt16" style="display:inline-block;background:#fff;padding:16px;border-radius:20px;box-shadow:0 0 50px rgba(139,124,246,.5)"><div id="teacher-active-qr-canvas"></div></div>
-      <div class="mt12"><span class="mono b gold" style="font-size:26px;letter-spacing:.2em" id="teacher-token-label">${esc(state.currentQrToken)}</span></div>
-      <div class="flex jc fw gap8 mt16 ac"><button class="btn goldb" onclick="openProjector('qr')"><span data-ic="cast"></span>Project Full Screen</button><button class="btn slate sm" onclick="manualRegenerateQr()"><span data-ic="rotate"></span>New Code</button>
-        <span class="tiny b">Star Power:</span>${[1, 2, 3].map(n => `<button class="btn sm ${mult === n ? 'goldb' : 'slate'}" onclick="setMultiplier(${n})">${n}×</button>`).join('')}</div></div>
-    <div class="cols-main">
-      <div class="card"><div class="flex jb ac fw gap8"><h3 class="ctitle disp">Roster &amp; PINs</h3><div class="flex gap8"><input class="field" id="roster-search" style="width:170px;padding:8px 11px" placeholder="Search…" oninput="filterRoster(this.value)"><button class="btn slate sm" onclick="promptSingleStudent()"><span data-ic="plus"></span>Add One</button></div></div>
-        <div id="roster-list" class="scroll mt16" style="max-height:480px;display:grid;gap:9px">${rosterHTML()}</div></div>
-      <div class="stack" style="--g:20px"><div class="card"><div class="flex jb ac"><h3 class="ctitle disp">Prize Store</h3><button class="btn pink sm" onclick="openAddPrizeModal()"><span data-ic="plus"></span>Add</button></div><div id="prize-list" class="scroll mt12" style="max-height:230px;display:grid;gap:8px">${prizesHTML()}</div></div>
-        <div class="card"><h3 class="ctitle disp">🎟️ Prize Claims</h3><div id="claims-list" class="scroll mt12" style="max-height:230px;display:grid;gap:8px">${claimsHTML()}</div></div></div>
-    </div></div>`;
+    <div class="flex jb ac fw gap16"><div><span class="chip">TEACHER HUB</span><h2 class="hero-title disp neon mt8" style="font-size:36px">Command Center</h2>
+      <p class="tiny mt8">Students: <b style="color:#fff" id="roster-count">${state.students.length}</b> · Claims waiting: <b class="gold" id="claims-pending">${pend}</b></p></div>
+      <div class="flex fw gap8"><button class="btn goldb sm" onclick="openPicker()"><span data-ic="dice"></span>Random Picker</button><button class="btn slate sm" onclick="openProjector('board')"><span data-ic="cast"></span>Projector</button>
+        <button class="btn slate sm" onclick="openSettings()"><span data-ic="sliders"></span>Settings</button><button class="btn slate sm" onclick="lockTeacher()"><span data-ic="lock"></span>Lock</button></div></div>
+    ${Cloud.configured && !Cloud.on ? connNotice() : ''}
+    <div class="card gold-b"><div class="flex ac gap24 fw jc">
+      <div class="qrbox"><div id="teacher-active-qr-canvas"></div></div>
+      <div class="f1" style="min-width:250px"><span class="chip gold">⚡ STAR DISPENSER</span>
+        <div class="mono b gold mt8" style="font-size:34px;letter-spacing:.2em" id="teacher-token-label">${esc(state.currentQrToken)}</div>
+        <p class="tiny mt4">Each scan gives <b class="gold">+${mult} star${mult > 1 ? 's' : ''}</b>, then the code changes instantly.</p>
+        <div class="flex fw gap8 mt12 ac"><button class="btn goldb" onclick="openProjector('qr')"><span data-ic="cast"></span>Project Full Screen</button><button class="btn slate sm" onclick="manualRegenerateQr()"><span data-ic="rotate"></span>New Code</button></div>
+        <div class="flex fw gap8 mt12 ac"><span class="tiny b">Star Power:</span>${[1, 2, 3].map(n => `<button class="btn sm ${mult === n ? 'goldb' : 'slate'}" onclick="setMultiplier(${n})">${n}×</button>`).join('')}</div></div></div></div>
+    <div><div class="tabs"><button class="tab ${tab === 'roster' ? 'active' : ''}" onclick="setTab('roster')"><span data-ic="users"></span>Roster</button>
+      <button class="tab ${tab === 'prizes' ? 'active' : ''}" onclick="setTab('prizes')"><span data-ic="gift"></span>Prizes${pend ? ' <span class="chip gold">' + pend + '</span>' : ''}</button>
+      <button class="tab ${tab === 'setup' ? 'active' : ''}" onclick="setTab('setup')"><i class="dot ${cdot}"></i>Cloud &amp; Backup</button></div>
+      <div class="mt16">${body}</div></div></div>`;
 }
 
-function renderTeacherQrCanvas() { drawQR($('teacher-active-qr-canvas'), state.currentQrToken, 190); }
+function renderTeacherQrCanvas() { drawQR($('teacher-active-qr-canvas'), state.currentQrToken, 170); }
 async function manualRegenerateQr() { await mutate(st => { st.currentQrToken = newCode(); return { ok:true }; }); renderTeacherQrCanvas(); const l = $('teacher-token-label'); if (l) l.textContent = state.currentQrToken; showToast('New star code!', 'info'); }
 async function setMultiplier(n) { await mutate(st => { st.settings.multiplier = n; return { ok:true }; }); sfx('pop'); showToast(n > 1 ? '⚡ ' + n + '× Star Power on!' : 'Back to normal stars', 'success'); renderView('teacher-dashboard'); }
+
+/* ===== password (hashed, so it is not readable in the shared class data) ===== */
+async function hashPw(p) {
+  try { if (window.crypto && crypto.subtle) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('starchamps:' + p)); return 'h1:' + Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2, '0')).join(''); } } catch (e) {}
+  return 'b64:' + btoa(unescape(encodeURIComponent(p)));
+}
+async function checkPassword(p) {
+  const s = state.settings;
+  if (s.passHash) return (await hashPw(p)) === s.passHash;
+  if (s.passB64) { try { return p === atob(s.passB64); } catch (e) { return false; } }
+  return p === 'qwerty';
+}
 
 /* ===== actions ===== */
 async function handleTeacherLogin(e) {
   e.preventDefault();
-  const pwd = $('teacher-password-input').value; let real = 'qwerty';
-  try { real = atob(state.settings.passB64 || 'cXdlcnR5'); } catch (err) {}
-  if (pwd === real) {
+  const pwd = $('teacher-password-input').value;
+  if (await checkPassword(pwd)) {
     ui.teacher = true; sfx('pop'); showToast('Teacher Hub unlocked', 'success');
-    if (Cloud.on && !Cloud.exists) await publishToCloud();
+    if (Cloud.on && !Cloud.exists && !Cloud.pub) { Cloud.pub = true; await publishToCloud(); }
+    if (!state.settings.passHash && !state.settings.passB64) setTimeout(() => showToast('Tip: change the default password in Settings', 'info'), 900);
     switchView('teacher-dashboard');
   } else { sfx('error'); showToast('Incorrect password!', 'error'); }
 }
@@ -822,7 +910,7 @@ function handleStudentPinLogin(e) {
   const name = $('login-name-input').value.trim().toLowerCase(), pin = $('login-pin-input').value.trim().toUpperCase();
   const s = state.students.find(x => x.name.toLowerCase() === name && x.pin.toUpperCase() === pin);
   if (s) { ui.activeStudentId = s.id; sfx('pop'); showToast('Welcome back, ' + s.name + '!', 'success'); switchView('student-dashboard'); }
-  else { sfx('error'); showToast('Name or PIN is not right. Try again!', 'error'); }
+  else { sfx('error'); showToast(Cloud.configured && !Cloud.on ? 'Still connecting to the class. Try again in a moment.' : 'Name or PIN is not right. Try again!', 'error'); }
 }
 async function processTokenClaim(raw) {
   if (claiming) return; const sid = ui.activeStudentId;
@@ -837,7 +925,7 @@ async function processTokenClaim(raw) {
     const after = levelInfo(me.totalEarned); if (after.i > before) addLog(st, '🚀', me.name + ' reached ' + after.cur.name + '!');
     return { ok:true, amt, leveled:after.i > before, lv:after.cur, stars:me.stars };
   });
-  if (res.error) { claiming = false; sfx('error'); showToast(explainError(res), 'error'); return; }
+  if (res.error) { claiming = false; if (res.error !== 'offline') { sfx('error'); showToast(explainError(res), 'error'); } return; }
   setTimeout(() => { claiming = false; }, 1200);
   killScanner(); sfx('star'); celebrate(); starPop('+' + res.amt + ' ⭐'); bg.boost = 1;
   showToast('Point claimed! You have ' + res.stars + ' stars', 'success'); switchView('student-dashboard');
@@ -850,9 +938,10 @@ async function claimPrize(id) {
     if (s.stars < p.cost) return { error:'poor' }; if (p.stock <= 0) return { error:'out' };
     s.stars -= p.cost; p.stock -= 1;
     st.redemptions.unshift({ id:'rd-' + Date.now() + '-' + Math.random().toString(36).slice(2, 5), studentId:s.id, name:s.name, title:p.title, icon:p.icon, cost:p.cost, t:Date.now(), done:false });
+    st.redemptions = st.redemptions.slice(0, 300);
     addLog(st, '🎁', s.name + ' claimed ' + p.title); return { ok:true, title:p.title };
   });
-  if (res.error) { sfx('error'); showToast(res.error === 'poor' ? 'Not enough stars!' : res.error === 'out' ? 'Out of stock!' : explainError(res), 'error'); renderView('student-shop'); return; }
+  if (res.error) { if (res.error !== 'offline') { sfx('error'); showToast(res.error === 'poor' ? 'Not enough stars!' : res.error === 'out' ? 'Out of stock!' : explainError(res), 'error'); } renderView('student-shop'); return; }
   sfx('star'); celebrate(); bg.boost = .8; showToast('Claimed "' + res.title + '"! Show your teacher.', 'success'); renderView('student-shop');
 }
 async function toggleClaim(id) { await mutate(st => { const r = st.redemptions.find(x => x.id === id); if (r) r.done = !r.done; return { ok:true }; }); refreshTeacherLists(); }
@@ -881,7 +970,7 @@ function deletePrize(id) {
 }
 
 /* ===== modals ===== */
-function openModal(html) { $('modal-content').innerHTML = html; $('modal').classList.add('open'); postRender(); }
+function openModal(html) { $('modal-content').innerHTML = html; $('modal').classList.add('open'); postRender(true); }
 function closeModal() { $('modal').classList.remove('open'); $('modal-content').innerHTML = ''; }
 function modalHead(t) { return `<div class="flex jb ac" style="border-bottom:1px solid var(--line);padding-bottom:12px"><h3 class="ctitle disp">${t}</h3><button onclick="closeModal()" style="background:none;border:0;color:#a9a4d3;cursor:pointer">${ic('x', 20)}</button></div>`; }
 function askConfirm(msg, yes) {
@@ -898,10 +987,11 @@ async function processBulkStudents() {
   const t = $('bulk-students-input'); if (!t) return;
   const names = t.value.split(/[\n,]+/).map(n => n.trim().slice(0, 40)).filter(Boolean);
   if (!names.length) { showToast('Enter at least one name', 'error'); return; }
-  await mutate(st => {
+  const res = await mutate(st => {
     names.forEach(name => st.students.push({ id:'stu-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), name, pin:pinFor(st), stars:0, totalEarned:0, avatar:AVATARS[Math.floor(Math.random() * AVATARS.length)] }));
     addLog(st, '📋', names.length + ' new students joined the league!'); return { ok:true };
   });
+  if (res.error) { showToast(explainError(res), 'error'); return; }
   closeModal(); renderView('teacher-dashboard'); showToast('Added ' + names.length + ' students with PINs', 'success');
 }
 function promptSingleStudent() {
@@ -910,11 +1000,12 @@ function promptSingleStudent() {
 }
 async function saveSingleStudent(e) {
   e.preventDefault(); const i = $('single-student-name-input'); if (!i || !i.value.trim()) return; const name = i.value.trim().slice(0, 40);
-  await mutate(st => { st.students.push({ id:'stu-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), name, pin:pinFor(st), stars:0, totalEarned:0, avatar:AVATARS[Math.floor(Math.random() * AVATARS.length)] }); return { ok:true }; });
+  const res = await mutate(st => { st.students.push({ id:'stu-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), name, pin:pinFor(st), stars:0, totalEarned:0, avatar:AVATARS[Math.floor(Math.random() * AVATARS.length)] }); return { ok:true }; });
+  if (res.error) { showToast(explainError(res), 'error'); return; }
   closeModal(); refreshTeacherLists(); showToast('Added ' + name + '!', 'success');
 }
 function openAddPrizeModal() {
-  openModal(`${modalHead('Add New Prize 🎁')}<form onsubmit="saveNewPrize(event)" class="stack mt16" style="--s:14px">
+  openModal(`${modalHead('Add New Prize 🎁')}<form onsubmit="saveNewPrize(event)" class="stack mt16">
     <div><label class="lbl">Prize title</label><input class="field" id="prize-title-input" required></div>
     <div class="cols-2"><div><label class="lbl">Star cost</label><input class="field" type="number" id="prize-cost-input" min="1" value="10"></div><div><label class="lbl">Stock</label><input class="field" type="number" id="prize-stock-input" min="1" value="10"></div></div>
     <div><label class="lbl">Emoji icon</label><input class="field" id="prize-icon-input" value="🎁"></div><div><label class="lbl">Description</label><textarea class="field" id="prize-desc-input" rows="2"></textarea></div>
@@ -923,21 +1014,35 @@ function openAddPrizeModal() {
 async function saveNewPrize(e) {
   e.preventDefault();
   const prize = { id:'prz-' + Date.now(), title:$('prize-title-input').value.trim(), cost:Math.max(1, parseInt($('prize-cost-input').value) || 10), stock:Math.max(1, parseInt($('prize-stock-input').value) || 10), icon:$('prize-icon-input').value.trim() || '🎁', description:$('prize-desc-input').value.trim() };
-  await mutate(st => { st.prizes.push(prize); return { ok:true }; }); closeModal(); refreshTeacherLists(); showToast('Prize added', 'success');
+  const res = await mutate(st => { st.prizes.push(prize); return { ok:true }; });
+  if (res.error) { showToast(explainError(res), 'error'); return; }
+  closeModal(); refreshTeacherLists(); showToast('Prize added', 'success');
 }
+
+/* fast random picker: ~1 second */
 function openPicker() {
   if (!state.students.length) { showToast('Add students first', 'error'); return; }
-  openModal(`${modalHead('Random Picker 🎲')}<div class="tc mt16"><div id="picker-avatar" style="font-size:78px">🎲</div><div id="picker-name" class="disp neon" style="font-size:34px;font-weight:700;min-height:44px">Ready?</div><button class="btn goldb lg block mt16" id="picker-btn" onclick="spinPicker()">SPIN!</button></div>`);
+  openModal(`${modalHead('Random Picker 🎲')}<div class="tc mt16"><div id="picker-avatar" style="font-size:78px">🎲</div><div id="picker-name" class="disp neon" style="font-size:34px;font-weight:700;min-height:44px">Ready?</div>
+    <label class="tiny flex jc ac gap8 mt12" style="cursor:pointer"><input type="checkbox" id="picker-norepeat" checked> Skip students already picked</label>
+    <button class="btn goldb lg block mt12" id="picker-btn" onclick="spinPicker()">SPIN!</button></div>`);
 }
 function spinPicker() {
-  const btn = $('picker-btn'); if (btn.disabled) return; btn.disabled = true;
-  const list = state.students; let step = 0, delay = 60; const total = 26 + Math.floor(Math.random() * 10);
+  const btn = $('picker-btn'); if (!btn || btn.disabled) return; btn.disabled = true;
+  const nr = $('picker-norepeat') && $('picker-norepeat').checked;
+  if (!ui.picked) ui.picked = new Set();
+  let pool = state.students.filter(s => !nr || !ui.picked.has(s.id));
+  if (!pool.length) { ui.picked.clear(); pool = state.students.slice(); showToast('Everyone has been picked. Starting over!', 'info'); }
+  const winner = pool[Math.floor(Math.random() * pool.length)]; ui.picked.add(winner.id);
+  const ticks = 12; let i = 0, delay = 45;
   (function tick() {
-    const s = list[Math.floor(Math.random() * list.length)], n = $('picker-name'), a = $('picker-avatar'); if (!n) return;
-    n.textContent = s.name; a.textContent = s.avatar; sfx('pop'); step++;
-    if (step < total) { delay *= 1.09; setTimeout(tick, delay); } else { celebrate(); sfx('star'); bg.boost = 1; btn.disabled = false; btn.textContent = 'SPIN AGAIN'; }
+    const n = $('picker-name'), a = $('picker-avatar'); if (!n) return;
+    const last = i === ticks, s = last ? winner : state.students[Math.floor(Math.random() * state.students.length)];
+    n.textContent = s.name; a.textContent = s.avatar; sfx('pop'); i++;
+    if (!last) { delay *= 1.13; setTimeout(tick, delay); }
+    else { celebrate(); sfx('star'); bg.boost = 1; btn.disabled = false; btn.textContent = 'SPIN AGAIN'; }
   })();
 }
+
 function openPinList() {
   const text = [...state.students].sort((a, b) => a.name.localeCompare(b.name)).map(s => s.name + ' - ' + s.pin).join('\n');
   openModal(`${modalHead('PIN List 🔑')}<p class="tiny mt12">Copy this into a doc to hand out PINs. Keep it private!</p><textarea class="field mono mt12" id="pin-text" readonly rows="10">${esc(text)}</textarea><button class="btn blue lg block mt12" onclick="copyText('pin-text')">Copy to Clipboard</button>`);
@@ -948,44 +1053,41 @@ function copyText(id) {
 }
 function openSettings() {
   openModal(`${modalHead('Settings')}<div class="mt16"><label class="lbl">Change teacher password</label><div class="flex gap8"><input class="field" type="password" id="new-pass-input" placeholder="New password (4+ characters)"><button class="btn purple" onclick="saveNewPassword()">Save</button></div>
-    <p class="tiny mt8">This is a classroom lock, not bank-grade security. Students who read the page source could find it.</p></div>
+    <p class="tiny mt8">Classroom-level lock. The password is stored scrambled (hashed), but pick something students would not guess.</p></div>
     <div class="mt24"><label class="lbl">New season</label><button class="btn red block" onclick="newSeason()">Reset all stars to 0 (keeps students &amp; PINs)</button></div>`);
 }
-async function saveNewPassword() { const v = $('new-pass-input').value; if (v.length < 4) { showToast('Use at least 4 characters', 'error'); return; } await mutate(st => { st.settings.passB64 = btoa(v); return { ok:true }; }); closeModal(); showToast('Password updated', 'success'); }
+async function saveNewPassword() {
+  const v = $('new-pass-input').value; if (v.length < 4) { showToast('Use at least 4 characters', 'error'); return; }
+  const h = await hashPw(v); const res = await mutate(st => { st.settings.passHash = h; st.settings.passB64 = null; return { ok:true }; });
+  if (res.error) { showToast(explainError(res), 'error'); return; }
+  closeModal(); showToast('Password updated', 'success');
+}
 function newSeason() {
   askConfirm('Reset every student to 0 stars and clear the activity feed?', async () => {
     await mutate(st => { st.students.forEach(s => { s.stars = 0; s.totalEarned = 0; }); st.activity = []; st.redemptions = []; addLog(st, '🏁', 'A brand new season has started!'); return { ok:true }; });
     renderView('teacher-dashboard'); showToast('New season started!', 'success');
   });
 }
-
-function openSaveModal(help) {
+function openSaveModal() {
   const c = Store.caps, row = (ok, label) => `<div class="feed flex jb"><span>${label}</span><b style="color:${ok ? '#34d399' : '#94a3b8'}">${ok ? 'Working' : 'Blocked'}</b></div>`;
-  const admin = ui.teacher, json = admin ? JSON.stringify(getPayload(), null, 2) : '';
-  openModal(`${modalHead('Save &amp; Connect')}
-    <p class="small mt12" style="color:#d4d0f5">Every change saves instantly on this device, so reloads keep your roster, stars, prizes and logins.</p>
-    <div style="display:grid;gap:7px" class="mt12">${row(c.local, 'Browser storage')}${row(c.idb, 'Browser database')}${row(c.tab, 'Tab memory (reload safe)')}</div>
-    ${admin ? `<div class="mt24"><div class="b small">1. Save a copy on your computer</div><p class="tiny mt4">Press <b>Save to my computer</b> in the Teacher Hub, pick a file, and every change is written to it automatically (Chrome or Edge on a computer). If your editor blocks this, use the backup buttons below.</p></div>
-    <div class="mt16"><div class="b small">2. Make students' devices all share one class</div>
-      <p class="tiny mt4">Right now each device keeps its own data. For students on their own Chromebooks to add stars to <b>your</b> class, set up a free Firebase database (about 5 minutes):</p>
-      <ol class="tiny" style="padding-left:18px;margin:8px 0;display:grid;gap:5px"><li>Go to <b>console.firebase.google.com</b>, click <b>Add project</b>, and name it anything.</li><li>Open <b>Build, then Firestore Database</b>, click <b>Create database</b>, and choose <b>Start in test mode</b>.</li><li>Open <b>Project settings (gear icon)</b>, scroll to <b>Your apps</b>, click the <b>&lt;/&gt;</b> web icon, and register an app.</li><li>Copy the <b>firebaseConfig</b> values it shows you.</li><li>In this code, find <b class="mono">const FIREBASE_CONFIG = null;</b> near the top and replace <b>null</b> with <b class="mono">{ apiKey:"...", authDomain:"...", projectId:"...", appId:"..." }</b>. Run it, then share that same link with students.</li></ol>
-      <p class="tiny" style="color:#fde68a">Heads up: test mode lets anyone with the link read and write, and expires after 30 days. Use first names plus a last initial, not full names.</p></div>
-    <div class="mt24" style="border-top:1px solid var(--line);padding-top:16px"><div class="b small">Backup &amp; restore</div>
-      <div class="flex fw gap8 mt8"><button class="btn green sm" onclick="downloadBackup()"><span data-ic="download"></span>Download Backup</button><button class="btn slate sm" onclick="triggerImportFile()"><span data-ic="upload"></span>Restore from File</button></div>
-      <textarea class="field mono mt8" id="backup-text" rows="4" readonly style="font-size:10px">${esc(json)}</textarea><button class="btn blue block mt8" onclick="copyText('backup-text')">Copy Backup Text</button>
-      <textarea class="field mono mt8" id="restore-text" rows="3" style="font-size:10px" placeholder="Or paste backup text here to restore…"></textarea><button class="btn purple block mt8" onclick="restoreFromText($('restore-text').value)">Restore From Pasted Text</button></div>` : '<p class="tiny mt16">Teachers: open the Teacher Hub for saving, backup and setup help.</p>'}`);
+  const cloudTxt = Cloud.configured ? (Cloud.on ? 'Live. Every device shares one class.' : (Cloud.error ? 'Cannot connect: ' + esc(Cloud.error) : 'Connecting…')) : 'Not set up. This device keeps its own data.';
+  openModal(`${modalHead('Save Status 💾')}
+    <div class="feed mt12"><span>☁️</span><div><b>All devices:</b> ${cloudTxt}</div></div>
+    <div style="display:grid;gap:7px" class="mt12">${row(c.local, 'This device: browser storage')}${row(c.idb, 'This device: browser database')}</div>
+    ${ui.teacher ? `<button class="btn purple block mt16" onclick="closeModal();setTab('setup')">Open Cloud &amp; Backup</button>` : '<p class="tiny mt16">Teachers: open the Teacher tab, then Cloud &amp; Backup, to share the class across devices.</p>'}`);
 }
 function downloadBackup() {
   try { const blob = new Blob([JSON.stringify(getPayload(), null, 2)], { type:'application/json' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'StarChampions_Backup_' + new Date().toISOString().slice(0, 10) + '.json'; document.body.appendChild(a); a.click(); a.remove(); showToast('Backup downloaded', 'success'); }
-  catch (e) { showToast('Downloads are blocked here. Use Copy Backup Text.', 'info'); }
+  catch (e) { showToast('Downloads are blocked here.', 'info'); }
 }
 function triggerImportFile() { $('json-import-input').click(); }
 function handleImportFile(ev) { const f = ev.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = e => restoreFromText(e.target.result); r.readAsText(f); ev.target.value = ''; }
 async function restoreFromText(txt) {
   const o = Store.parse(String(txt || '').trim()); if (!o) { showToast('That does not look like a valid backup', 'error'); return; }
-  const data = Object.assign({}, o);
-  if (Cloud.on) { await mutate(st => { st.students = data.students; st.prizes = data.prizes || st.prizes; st.activity = data.activity || []; st.redemptions = data.redemptions || []; st.settings = Object.assign(st.settings, data.settings || {}); return { ok:true }; }); }
-  else { applyData(data); saveState(); }
+  if (Cloud.configured) {
+    const res = await mutate(st => { st.students = o.students; st.prizes = o.prizes || st.prizes; st.activity = o.activity || []; st.redemptions = o.redemptions || []; st.settings = Object.assign(st.settings, o.settings || {}); return { ok:true }; });
+    if (res.error) { showToast(explainError(res), 'error'); return; }
+  } else { applyData(o); saveState(); }
   closeModal(); if (ui.view === 'teacher-dashboard') renderView('teacher-dashboard'); else softRerender(); showToast('Restored ' + state.students.length + ' students', 'success');
 }
 
@@ -996,7 +1098,7 @@ function sfx(type) {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); const ctx = audioCtx; if (ctx.state === 'suspended') ctx.resume();
     const tone = (f, t0, dur, wave = 'sine', vol = .18) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = wave; o.frequency.setValueAtTime(f, ctx.currentTime + t0); g.gain.setValueAtTime(vol, ctx.currentTime + t0); g.gain.exponentialRampToValueAtTime(.001, ctx.currentTime + t0 + dur); o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime + t0); o.stop(ctx.currentTime + t0 + dur + .02); };
     if (type === 'star') [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, i * .07, .2));
-    else if (type === 'pop') tone(520, 0, .07, 'triangle', .12);
+    else if (type === 'pop') tone(520, 0, .06, 'triangle', .1);
     else if (type === 'error') tone(160, 0, .2, 'sawtooth', .15);
     else if (type === 'level') [392, 523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => tone(f, i * .09, .25));
   } catch (e) {}
