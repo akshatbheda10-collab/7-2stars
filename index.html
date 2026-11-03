@@ -6,318 +6,333 @@
 <meta name="theme-color" content="#070514">
 <meta name="robots" content="noindex">
 <title>Star Champions - Class Rewards League</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏆</text></svg>">
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⭐</text></svg>">
+<link href="https://fonts.googleapis.com/css?family=Fredoka:wght@500;600;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>if (typeof Html5QrcodeScanner === 'undefined') document.write('<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"><\/script>');</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-
-<!-- Cloud engine: shares one class between every device (needs the one-time Firebase setup in Teacher Hub > Cloud & Backup) -->
+<!-- Supabase Client Library -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Supabase Realtime & Engine Implementation -->
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getFirestore, doc, onSnapshot, runTransaction, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-let db = null, ref = null;
-window.CloudInit = function (cfg, room, onRemote) {
-  return new Promise(resolve => {
-    let first = true;
-    const done = ok => { if (first) { first = false; resolve(ok); } };
-    try {
-      const app = initializeApp(cfg, 'star-champions');
-      db = getFirestore(app);
-      ref = doc(db, 'starChampionsRooms', room);
-      onSnapshot(ref, snap => {
-        let data = null;
-        try { if (snap.exists()) data = JSON.parse(snap.data().json); } catch (e) {}
-        onRemote(snap.exists(), data, null); done(true);
-      }, err => { onRemote(false, null, err.code || err.message); done(false); });
-      setTimeout(() => done(false), 9000);
-    } catch (e) { onRemote(false, null, e.message); done(false); }
-  });
-};
-window.CloudMutate = async function (fn) {
-  return await runTransaction(db, async tx => {
-    const snap = await tx.get(ref);
-    if (!snap.exists()) return { result: { error: 'no-class' }, st: null };
-    const st = JSON.parse(snap.data().json);
+  const SUPABASE_URL = "https://wtqqyadgolqbtoqizfvd.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_TnD-uSOe2lD40FXzP52OKQ_7hjfaC0v";
+
+  let supabase = null;
+  let roomName = 'CLASS-1';
+  let subscription = null;
+
+  window.CloudInit = function (cfg, room, onRemote) {
+    return new Promise((resolve) => {
+      let first = true;
+      const done = (ok) => { if (first) { first = false; resolve(ok); } };
+      try {
+        roomName = room || 'CLASS-1';
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // Initial Data Fetch
+        supabase
+          .from('star_champions_rooms')
+          .select('json')
+          .eq('room', roomName)
+          .maybeSingle()
+          .then(({ data, error }) => {
+            if (error) {
+              onRemote(false, null, error.message);
+              done(false);
+            } else if (data && data.json) {
+              onRemote(true, data.json, null);
+              done(true);
+            } else {
+              onRemote(false, null, null);
+              done(true);
+            }
+          });
+        // Live Realtime Listener
+        if (subscription) supabase.removeChannel(subscription);
+        subscription = supabase
+          .channel(`room:${roomName}`)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'star_champions_rooms', filter: `room=eq.${roomName}` },
+            (payload) => {
+              if (payload.new && payload.new.json) {
+                onRemote(true, payload.new.json, null);
+              }
+            }
+          )
+          .subscribe((status) => {
+            if (status === 'SUBSCRIBED') done(true);
+          });
+        setTimeout(() => done(false), 9000);
+      } catch (e) {
+        onRemote(false, null, e.message);
+        done(false);
+      }
+    });
+  };
+
+  window.CloudMutate = async function (fn) {
+    if (!supabase) return { result: { error: 'offline' }, st: null };
+    const { data, error } = await supabase
+      .from('star_champions_rooms')
+      .select('json')
+      .eq('room', roomName)
+      .maybeSingle();
+    if (error || !data) return { result: { error: 'no-class' }, st: null };
+    const st = data.json;
     const result = fn(st);
     if (result && result.error) return { result, st: null };
     st.savedAt = Date.now();
-    tx.set(ref, { json: JSON.stringify(st), savedAt: st.savedAt });
+    const { error: saveError } = await supabase
+      .from('star_champions_rooms')
+      .upsert({ room: roomName, json: st, saved_at: st.savedAt });
+    if (saveError) return { result: { error: 'cloud-fail' }, st: null };
     return { result, st };
-  });
-};
-window.CloudPublish = async function (payload) {
-  payload.savedAt = Date.now();
-  await setDoc(ref, { json: JSON.stringify(payload), savedAt: payload.savedAt });
-  return payload;
-};
+  };
+
+  window.CloudPublish = async function (payload) {
+    if (!supabase) throw new Error('Supabase client not initialized');
+    payload.savedAt = Date.now();
+    const { error } = await supabase
+      .from('star_champions_rooms')
+      .upsert({ room: roomName, json: payload, saved_at: payload.savedAt });
+    if (error) throw error;
+    return payload;
+  };
 </script>
-
 <style>
-  :root { --bg:#070514; --mute:#a9a4d3; --line:rgba(255,255,255,.1); --gold:#fbbf24; }
-  * { box-sizing:border-box; }
-  html, body { margin:0; background:var(--bg); color:#f4f2ff; overflow-x:hidden; }
-  body { font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif; min-height:100vh; line-height:1.45; }
-  h1,h2,h3,h4,p { margin:0; }
-  button { font-family:inherit; }
-  ::-webkit-scrollbar { width:7px; height:7px; } ::-webkit-scrollbar-thumb { background:#3b3566; border-radius:8px; }
-  .disp { font-family:'Fredoka','Arial Rounded MT Bold','Trebuchet MS',system-ui,sans-serif; }
-
-  #bg3d { position:fixed; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; }
-  .aurora { position:fixed; inset:0; z-index:0; pointer-events:none;
-    background: radial-gradient(60% 50% at 12% 6%, rgba(139,124,246,.32), transparent 60%), radial-gradient(50% 40% at 92% 12%, rgba(253,121,168,.2), transparent 60%), radial-gradient(60% 50% at 50% 108%, rgba(56,189,248,.2), transparent 60%); }
-
-  .flex{display:flex}.ac{align-items:center}.jb{justify-content:space-between}.jc{justify-content:center}.fw{flex-wrap:wrap}
-  .gap4{gap:4px}.gap8{gap:8px}.gap12{gap:12px}.gap16{gap:16px}.gap24{gap:24px}.f1{flex:1;min-width:0}.tc{text-align:center}
-  .mt4{margin-top:4px}.mt8{margin-top:8px}.mt12{margin-top:12px}.mt16{margin-top:16px}.mt24{margin-top:24px}
-  .hide{display:none!important}.trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .mono{font-family:ui-monospace,Consolas,Menlo,monospace}.up{text-transform:uppercase}.b{font-weight:800}
-  .tiny{font-size:12px;color:var(--mute)}.small{font-size:13.5px}.gold{color:#fde68a}.pinkc{color:#f9a8d4}.muted{color:var(--mute)}
-  .stack > * + * { margin-top:20px; }
-  .wrap { position:relative; z-index:10; max-width:1120px; margin:0 auto; padding:26px 16px 70px; width:100%; }
-  .cols-2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; }
-  .cols-3 { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:16px; }
-  .cols-main { display:grid; grid-template-columns:2fr 1fr; gap:18px; }
-  @media (max-width:900px){ .cols-main{grid-template-columns:1fr;} .hide-sm{display:none!important;} }
-
-  .topbar { position:sticky; top:0; z-index:40; padding:10px 16px; background:rgba(10,7,30,.7); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-bottom:1px solid var(--line); }
-  .topin { max-width:1120px; margin:0 auto; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; }
-  .logo { display:flex; align-items:center; gap:11px; cursor:pointer; }
-  .logo-badge { width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:22px; background:linear-gradient(135deg,#fde68a,#f59e0b); box-shadow:0 3px 0 #b45309; }
-  .brand { font-size:20px; font-weight:700; line-height:1; }
-  .neon { background:linear-gradient(90deg,#fde68a,#fb7185,#a78bfa); -webkit-background-clip:text; background-clip:text; color:transparent; }
-  .nav { display:flex; flex-wrap:wrap; gap:6px; }
-  .nav-btn { display:inline-flex; align-items:center; gap:7px; padding:8px 13px; border-radius:11px; font-weight:700; font-size:13px; color:#d9d5ff; background:transparent; border:1px solid transparent; cursor:pointer; transition:.15s; }
-  .nav-btn:hover { background:rgba(255,255,255,.08); }
-  .nav-btn.active { background:rgba(139,124,246,.22); color:#fff; border-color:rgba(167,139,250,.5); }
-  .nav-btn.status { border-color:var(--line); }
-  .ic { display:inline-block; vertical-align:middle; flex-shrink:0; }
-  .dot { width:9px; height:9px; border-radius:50%; background:#34d399; display:inline-block; flex-shrink:0; }
-  .dot.warn { background:var(--gold); } .dot.bad { background:#fb7185; }
-
-  .card { border-radius:20px; padding:20px; background:rgba(18,14,44,.74); border:1px solid rgba(255,255,255,.09); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); box-shadow:0 10px 30px rgba(0,0,0,.35); }
-  .card.gold-b { border-color:rgba(251,191,36,.4); }
-  .ctitle { font-size:18px; font-weight:700; }
-  .hero-title { font-size:clamp(32px,5.5vw,54px); font-weight:700; line-height:1.08; }
-  .chip { display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:800; letter-spacing:.05em; padding:3px 10px; border-radius:99px; background:rgba(167,139,250,.16); border:1px solid rgba(167,139,250,.4); color:#ddd6fe; }
-  .chip.gold { background:rgba(251,191,36,.12); border-color:rgba(251,191,36,.45); color:#fde68a; }
-
-  .tilt { position:relative; transform-style:preserve-3d; transition:transform .15s ease-out; will-change:transform; }
-  .tilt::after { content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none; opacity:0; transition:opacity .2s; background:radial-gradient(280px circle at var(--mx,50%) var(--my,50%), rgba(255,255,255,.16), transparent 45%); }
-  .tilt:hover::after { opacity:1; }
-  .lift { transform:translateZ(36px); }
-
-  .btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:10px 16px; border-radius:12px; font-weight:800; font-size:13px; color:#fff; cursor:pointer; border:0; text-decoration:none;
-    box-shadow:0 4px 0 var(--sh,#312e81), 0 8px 14px rgba(0,0,0,.3); transition:transform .08s, box-shadow .08s, filter .15s; background:var(--bgc,#6c5ce7); }
-  .btn:hover { filter:brightness(1.12); }
-  .btn:active { transform:translateY(3px); box-shadow:0 1px 0 var(--sh,#312e81), 0 3px 8px rgba(0,0,0,.3); }
-  .btn:disabled { opacity:.45; cursor:not-allowed; filter:grayscale(.7); transform:none; }
-  .btn.sm { padding:6px 11px; font-size:12px; border-radius:10px; box-shadow:0 3px 0 var(--sh,#312e81), 0 5px 10px rgba(0,0,0,.25); }
-  .btn.lg { padding:13px 22px; font-size:15px; }
-  .btn.block { display:flex; width:100%; }
-  .purple{--bgc:#6c5ce7;--sh:#3b2fa6}.pink{--bgc:#ec4899;--sh:#9d174d}.blue{--bgc:#0ea5e9;--sh:#0c5a86}.green{--bgc:#10b981;--sh:#047857}
-  .slate{--bgc:#3a3566;--sh:#211d3f}.red{--bgc:#f43f5e;--sh:#9f1239}.goldb{--bgc:#fbbf24;--sh:#b45309;color:#1c1917}
-
-  .field { width:100%; background:rgba(7,5,20,.75); border:1px solid rgba(255,255,255,.14); border-radius:12px; padding:11px 13px; font-size:14px; color:#fff; outline:none; font-family:inherit; }
-  .field:focus { border-color:#a78bfa; box-shadow:0 0 0 3px rgba(167,139,250,.25); }
-  label.lbl { display:block; font-size:12px; font-weight:800; color:#d4d0f5; margin-bottom:5px; }
-
-  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); overflow-x:auto; }
-  .tab { padding:11px 18px; font-weight:800; font-size:13.5px; color:var(--mute); background:none; border:0; border-bottom:3px solid transparent; cursor:pointer; white-space:nowrap; display:inline-flex; align-items:center; gap:8px; }
-  .tab:hover { color:#fff; } .tab.active { color:#fff; border-bottom-color:#a78bfa; }
-
-  /* podium */
-  .stage-wrap { position:relative; perspective:1100px; padding-top:50px; }
-  .floor { position:absolute; left:50%; bottom:-40px; width:150%; height:300px; transform:translateX(-50%) perspective(520px) rotateX(70deg);
-    background-image:linear-gradient(rgba(167,139,250,.35) 1px,transparent 1px),linear-gradient(90deg,rgba(167,139,250,.35) 1px,transparent 1px); background-size:44px 44px;
-    -webkit-mask-image:radial-gradient(closest-side,#000 35%,transparent); mask-image:radial-gradient(closest-side,#000 35%,transparent); pointer-events:none; }
-  .beam { position:absolute; left:50%; top:0; width:260px; height:100%; transform:translateX(-50%); pointer-events:none; filter:blur(8px); background:linear-gradient(180deg,rgba(253,224,71,.26),transparent 90%); clip-path:polygon(38% 0,62% 0,100% 100%,0 100%); }
-  .stage3d { position:relative; display:flex; gap:14px; align-items:flex-end; max-width:620px; margin:0 auto; transform-style:preserve-3d; transform:rotateX(calc(-13deg + var(--ty,0) * 1deg)) rotateY(calc(var(--tx,0) * 1deg)); transition:transform .25s ease-out; }
-  .pod-col { flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; transform-style:preserve-3d; min-width:0; }
-  .pod-person { text-align:center; margin-bottom:12px; transform:translateZ(36px); max-width:100%; }
-  .pod-avatar { width:66px; height:66px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:33px; margin:0 auto; background:#1b1740; border:3px solid var(--rim); box-shadow:0 0 22px var(--rim); animation:bob 3s ease-in-out infinite; }
-  .p1 { --rim:#fbbf24; } .p2 { --rim:#cbd5e1; } .p3 { --rim:#d97706; }
-  .p1 .pod-avatar { width:82px; height:82px; font-size:42px; }
-  @keyframes bob { 50% { transform:translateY(-9px); } }
-  .pod { width:100%; position:relative; transform-style:preserve-3d; }
-  .pod .slice, .pod .pod-face { position:absolute; inset:0; border-radius:16px 16px 0 0; }
-  .pod.p1 .slice, .pod.p1 .pod-face { background:linear-gradient(180deg,#fde68a,#f59e0b 60%,#b45309); }
-  .pod.p2 .slice, .pod.p2 .pod-face { background:linear-gradient(180deg,#f1f5f9,#94a3b8 60%,#475569); }
-  .pod.p3 .slice, .pod.p3 .pod-face { background:linear-gradient(180deg,#fdba74,#d97706 60%,#7c2d12); }
-  .pod-face { display:flex; justify-content:center; padding-top:14px; font-family:'Fredoka',system-ui; font-weight:700; font-size:34px; color:rgba(0,0,0,.5); box-shadow:inset 0 2px 0 rgba(255,255,255,.6); }
-
-  .srow { display:flex; align-items:center; gap:12px; padding:10px 14px; border-radius:14px; background:rgba(7,5,20,.5); border:1px solid rgba(255,255,255,.07); border-left:4px solid var(--rc,#3b3566); transition:.15s; }
-  .srow:hover { background:rgba(40,30,90,.5); }
-  .srow.first { border-color:rgba(251,191,36,.45); border-left-color:#fbbf24; }
-  .rank { min-width:38px; height:30px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-family:'Fredoka',system-ui; font-weight:700; font-size:13px; background:rgba(255,255,255,.1); color:#b6b1e0; }
-  .r1{background:#fbbf24;color:#1c1917}.r2{background:#cbd5e1;color:#1c1917}.r3{background:#d97706;color:#fff}
-  .av { font-size:25px; width:38px; text-align:center; }
-  .sname { font-weight:800; font-size:14.5px; }
-  .bar { width:120px; height:9px; border-radius:99px; background:rgba(255,255,255,.1); overflow:hidden; }
-  .bar i, .xp i { display:block; height:100%; width:0; border-radius:99px; background:linear-gradient(90deg,#6c5ce7,#fd79a8,#fdcb6e); transition:width 1s cubic-bezier(.2,.8,.2,1); }
-  .xp { height:13px; border-radius:99px; background:rgba(255,255,255,.1); overflow:hidden; }
-  .starpill { font-family:'Fredoka',system-ui; font-weight:700; font-size:15px; color:#fde68a; padding:4px 11px; border-radius:10px; background:rgba(251,191,36,.1); border:1px solid rgba(251,191,36,.3); white-space:nowrap; }
-  .scroll { overflow-y:auto; padding-right:4px; }
-  .feed { padding:10px 12px; border-radius:12px; background:rgba(7,5,20,.5); border:1px solid rgba(255,255,255,.06); font-size:13px; display:flex; gap:10px; }
-  .box { border-radius:16px; padding:14px; background:rgba(7,5,20,.6); border:1px solid rgba(255,255,255,.09); text-align:center; }
-  .bignum { font-family:'Fredoka',system-ui; font-weight:700; font-size:40px; line-height:1.1; }
-  .tile { display:block; width:100%; text-align:left; border:0; color:#fff; padding:22px; border-radius:22px; cursor:pointer; }
-  .prize-ic { width:64px; height:64px; border-radius:18px; background:rgba(255,255,255,.08); display:flex; align-items:center; justify-content:center; font-size:36px; margin:0 auto 12px; transform:translateZ(40px); }
-  .pill-status { display:inline-flex; align-items:center; gap:7px; padding:7px 12px; border-radius:11px; font-size:12.5px; font-weight:700; background:rgba(7,5,20,.6); border:1px solid var(--line); }
-  .notice { padding:13px 15px; border-radius:14px; font-size:13px; background:rgba(251,191,36,.09); border:1px solid rgba(251,191,36,.4); color:#fde68a; }
-  .notice.bad { background:rgba(244,63,94,.1); border-color:rgba(244,63,94,.5); color:#fecdd3; }
-  .steps { margin:8px 0 0; padding-left:20px; display:grid; gap:7px; font-size:13px; color:#d4d0f5; }
-  .qrbox { background:#fff; padding:12px; border-radius:16px; box-shadow:0 0 40px rgba(139,124,246,.4); flex-shrink:0; }
-
-  .star-pop { position:fixed; left:50%; top:42%; z-index:120; pointer-events:none; font-family:'Fredoka',system-ui; font-weight:700; font-size:min(20vw,140px); color:#fde68a; white-space:nowrap; text-shadow:0 0 40px rgba(253,203,110,.9),0 8px 0 #b45309; animation:starPop 1.3s cubic-bezier(.2,1.4,.4,1) forwards; }
-  @keyframes starPop { 0%{transform:translate(-50%,-50%) scale(.2) rotate(-20deg);opacity:0} 25%{transform:translate(-50%,-50%) scale(1.15) rotate(5deg);opacity:1} 70%{transform:translate(-50%,-55%) scale(1);opacity:1} 100%{transform:translate(-50%,-120%) scale(.8);opacity:0} }
-  .levelup { position:fixed; inset:0; z-index:125; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; background:rgba(7,5,20,.8); backdrop-filter:blur(6px); animation:fadeIn .3s ease; pointer-events:none; }
-  .levelup .big { font-size:110px; animation:spin 1.6s ease-out 1; }
-  @keyframes spin { to { transform:rotateY(360deg); } }
-  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
-  @keyframes rise { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
-  .wrap > * { animation:rise .3s ease both; }
-  .wrap.quiet > * { animation:none; }
-  #modal { display:none; position:fixed; inset:0; z-index:100; align-items:center; justify-content:center; padding:16px; background:rgba(7,5,20,.82); backdrop-filter:blur(6px); }
-  #modal.open { display:flex; }
-  #modal-content { max-width:560px; width:100%; max-height:90vh; overflow-y:auto; }
-  #toast-container { position:fixed; bottom:20px; right:20px; z-index:130; display:flex; flex-direction:column; gap:8px; pointer-events:none; }
-  .toast { color:#fff; font-size:13px; font-weight:800; padding:11px 16px; border-radius:12px; border:1px solid rgba(255,255,255,.25); max-width:320px; box-shadow:0 10px 30px rgba(0,0,0,.4); transition:.3s; }
-  #fatal { position:fixed; left:12px; right:12px; bottom:12px; z-index:200; }
-
-  #projector { position:fixed; inset:0; z-index:90; background:radial-gradient(80% 60% at 50% 0%,#241a5e,#070514 70%); overflow:auto; padding:18px 28px 40px; }
-  .proj-bar { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
-  .proj-title { font-size:clamp(34px,6vw,76px); font-weight:700; text-align:center; margin-top:6px; }
-  .proj-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px 24px; max-width:1100px; margin:18px auto 0; }
-  .proj-grid .srow { font-size:1.15em; }
-  .proj-qr { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:40px; margin-top:20px; }
-  .qr-board { background:#fff; padding:22px; border-radius:30px; box-shadow:0 0 90px rgba(139,124,246,.7); }
-  .bigcode { font-family:ui-monospace,Consolas,Menlo,monospace; font-weight:800; font-size:clamp(46px,9vw,120px); letter-spacing:.12em; color:#fde68a; text-shadow:0 0 40px rgba(251,191,36,.6); }
-  .proj .pod-avatar { width:88px; height:88px; font-size:46px; } .proj .p1 .pod-avatar { width:110px; height:110px; font-size:58px; }
-  .proj .stage3d { max-width:860px; } .proj .pod-person { font-size:1.2em; }
-  @media (max-width:760px){ .proj-grid{grid-template-columns:1fr;} #projector{padding:14px;} }
-  @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation:none !important; transition:none !important; } }
+:root { --bg:#070514; --mute:#a9a4d3; --line:rgba(255,255,255,.1); --gold:#fbbf24; }
+* { box-sizing:border-box; }
+html, body { margin:0; background:var(--bg); color:#f4f2ff; overflow-x:hidden; }
+body { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; min-height:100vh; line-height:1.45; }
+h1,h2,h3,h4,p { margin:0; }
+button { font-family:inherit; }
+::-webkit-scrollbar { width:7px; height:7px; } ::-webkit-scrollbar-thumb { background:#3b3566; border-radius:8px; }
+.disp { font-family:'Fredoka', 'Arial Rounded MT Bold', 'Trebuchet MS', system-ui, sans-serif; }
+#bg3d { position:fixed; inset:0; width: 100%; height: 100%; z-index:0; pointer-events:none; }
+.aurora { position:fixed; inset:0; z-index:0; pointer-events:none; background: radial-gradient(60% 50% at 12% 6%, rgba(139,124,246,.32), transparent 60%), radial-gradient(50% 40% at 92% 12%, rgba(253,121,168,.2), transparent 60%), radial-gradient(60% 50% at 50% 108%, rgba(56,189,248,.2), transparent 60%); }
+.flex{display:flex}.ac{align-items:center}.jb{justify-content:space-between}.jc{justify-content:center}.fw{flex-wrap:wrap}
+.gap4{gap:4px}.gap8{gap:8px}.gap12{gap:12px}.gap16{gap:16px}.gap24{gap:24px}.f1{flex:1;min-width:0}.tc{text-align:center}
+.mt4{margin-top:4px}.mt8{margin-top:8px}.mt12{margin-top:12px}.mt16{margin-top:16px}.mt24{margin-top:24px}
+.hide{display:none!important}.trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mono{font-family:ui-monospace, Consolas, Menlo, monospace}.up{text-transform:uppercase}.b{font-weight:800}
+.tiny{font-size:12px; color:var(--mute)}.small{font-size: 13.5px}.gold{color:#fde68a}.pinkc{color:#f9a8d4}.muted{color:var(--mute)}
+.stack > * + * { margin-top:20px; }
+.wrap { position:relative; z-index:10; max-width: 1120px; margin:0 auto; padding:26px 16px 70px; width:100%; }
+.cols-2 { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:16px; }
+.cols-3 { display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:16px; }
+.cols-main { display:grid; grid-template-columns:2fr 1fr; gap:18px; }
+@media (max-width:900px) { .cols-main{grid-template-columns:1fr;} .hide-sm{display:none!important;} }
+.topbar { position:sticky; top:0; z-index:40; padding:10px 16px; background:rgba(10,7,30,.7); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-bottom:1px solid var(--line); }
+.topin { max-width: 1120px; margin:0 auto; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; }
+.logo { display:flex; align-items:center; gap: 11px; cursor:pointer; }
+.logo-badge { width:40px; height:40px; border-radius: 12px; display: flex; align-items:center; justify-content:center; font-size:22px; background:linear-gradient(135deg,#fde68a,#f59e0b); box-shadow:0 3px 0 #b45309; }
+.brand { font-size:20px; font-weight:700; line-height:1; }
+.neon { background:linear-gradient(90deg,#fde68a,#fb7185,#a78bfa); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.nav { display:flex; flex-wrap:wrap; gap:6px; }
+.nav-btn { display:inline-flex; align-items:center; gap:7px; padding:8px 13px; border-radius:11px; font-weight:700; font-size:13px; color:#d9d5ff; background:transparent; border:1px solid transparent; cursor:pointer; transition:.15s; }
+.nav-btn:hover { background:rgba(255,255,255,.08); }
+.nav-btn.active { background:rgba(139,124,246,.22); color:#fff; border-color:rgba(167,139,250,.5); }
+.nav-btn.status { border-color:var(--line); }
+.ic { display:inline-block; vertical-align:middle; flex-shrink:0; }
+.dot { width:9px; height:9px; border-radius:50%; background:#34d399; display:inline-block; flex-shrink:0; }
+.dot.warn { background:var(--gold); } .dot.bad { background:#fb7185; }
+.card { border-radius: 20px; padding:20px; background:rgba(18,14,44,.74); border:1px solid rgba(255,255,255,.09); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); box-shadow:0 10px 30px rgba(0,0,0,.35); }
+.card.gold-b { border-color:rgba(251,191,36,.4); }
+.ctitle { font-size: 18px; font-weight:700; }
+.hero-title { font-size:clamp(32px,5.5vw, 54px); font-weight:700; line-height:1.08; }
+.chip { display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:800; letter-spacing:.05em; padding:3px 10px; border-radius:99px; background:rgba(167,139,250,.16); border: 1px solid rgba(167,139,250,.4); color:#ddd6fe; }
+.chip.gold { background:rgba(251,191,36,.12); border-color:rgba(251,191,36,.45); color:#fde68a; }
+.tilt { position:relative; transform-style: preserve-3d; transition:transform .15s ease-out; will-change:transform; }
+.tilt::after { content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none; opacity:0; transition:opacity .2s; background:radial-gradient(280px circle at var(--mx,50%) var(--my,50%), rgba(255,255,255,.16), transparent 45%); }
+.tilt:hover::after { opacity:1; }
+.lift { transform:translateZ(36px); }
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:10px 16px; border-radius: 12px; font-weight:800; font-size:13px; color:#fff; cursor:pointer; border:0; text-decoration:none; box-shadow:0 4px 0 var(--sh, #312e81), 0 8px 14px rgba(0,0,0,.3); transition:transform .08s, box-shadow .08s, filter .15s; background:var(--bgc,#6c5ce7); }
+.btn:hover { filter:brightness(1.12); }
+.btn:active { transform:translateY(3px); box-shadow:0 1px 0 var(--sh,#312e81), 0 3px 8px rgba(0,0,0,.3); }
+.btn:disabled { opacity:.45; cursor:not-allowed; filter:grayscale(.7); transform:none; }
+.btn.sm { padding:6px 11px; font-size:12px; border-radius: 10px; box-shadow:0 3px 0 var(--sh,#312e81), 0 5px 10px rgba(0,0,0,.25); }
+.btn.lg { padding: 13px 22px; font-size:15px; }
+.btn.block { display: flex; width:100%; }
+.purple{--bgc:#6c5ce7;--sh:#3b2fa6}.pink{--bgc:#ec4899;--sh:#9d174d}.blue{--bgc:#0ea5e9;--sh:#0c5a86}.green{--bgc:#10b981;--sh:#047857}
+.slate{--bgc:#3a3566;--sh:#211d3f}.red{--bgc:#f43f5e;--sh:#9f1239}.goldb{--bgc:#fbbf24;--sh:#b45309;color:#1c1917}
+.field { width:100%; background:rgba(7,5,20,.75); border:1px solid rgba(255,255,255,.14); border-radius:12px; padding: 11px 13px; font-size: 14px; color:#fff; outline:none; font-family:inherit; }
+.field:focus { border-color:#a78bfa; box-shadow:0 0 0 3px rgba(167,139,250,.25); }
+label.lbl { display:block; font-size: 12px; font-weight:800; color:#d4d0f5; margin-bottom:5px; }
+.tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); overflow-x:auto; }
+.tab { padding: 11px 18px; font-weight:800; font-size: 13.5px; color:var(--mute); background:none; border:0; border-bottom:3px solid transparent; cursor:pointer; white-space:nowrap; display:inline-flex; align-items:center; gap:8px; }
+.tab:hover { color:#fff; } .tab.active { color:#fff; border-bottom-color:#a78bfa; }
+.stage-wrap { position:relative; perspective: 1100px; padding-top:50px; }
+.floor { position:absolute; left:50%; bottom:-40px; width: 150%; height:300px; transform:translateX(-50%) perspective(520px) rotateX(70deg); background-image:linear-gradient(rgba(167,139,250,.35) 1px, transparent 1px), linear-gradient(90deg,rgba(167,139,250,.35) 1px, transparent 1px); background-size:44px 44px; -webkit-mask-image:radial-gradient(closest-side, #000 35%, transparent); mask-image:radial-gradient(closest-side, #000 35%, transparent); pointer-events:none; }
+.beam { position:absolute; left:50%; top:0; width:260px; height:100%; transform:translateX(-50%); pointer-events:none; filter:blur(8px); background:linear-gradient(180deg, rgba(253,224,71,.26), transparent 90%); clip-path:polygon(38% 0,62% 0,100% 100%, 0 100%); }
+.stage3d { position:relative; display: flex; gap: 14px; align-items:flex-end; max-width:620px; margin:0 auto; transform-style:preserve-3d; transform:rotateX(calc(-13deg + var(--ty,0)*1deg)) rotateY(calc(var(--tx,0)*1deg)); transition:transform .25s ease-out; }
+.pod-col { flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; transform-style:preserve-3d; min-width:0; }
+.pod-person { text-align:center; margin-bottom: 12px; transform: translateZ(36px); max-width:100%; }
+.pod-avatar { width:66px; height:66px; border-radius:50%; display: flex; align-items:center; justify-content:center; font-size:33px; margin:0 auto; background:#1b1740; border:3px solid var(--rim); box-shadow:0 0 22px var(--rim); animation:bob 3s ease-in-out infinite; }
+.p1 { --rim:#fbbf24; } .p2 { --rim:#cbd5e1; } .p3 { --rim:#d97706; }
+.p1.pod-avatar { width:82px; height:82px; font-size:42px; }
+@keyframes bob { 50% { transform:translateY(-9px); } }
+.pod { width:100%; position:relative; transform-style:preserve-3d; }
+.pod .slice, .pod .pod-face { position:absolute; inset:0; border-radius: 16px 16px 0 0; }
+.pod.p1 .slice, .pod.p1 .pod-face { background:linear-gradient(180deg, #fde68a,#f59e0b 60%,#b45309); }
+.pod.p2 .slice, .pod.p2 .pod-face { background:linear-gradient(180deg,#f1f5f9,#94a3b8 60%,#475569); }
+.pod.p3 .slice, .pod.p3 .pod-face { background:linear-gradient(180deg,#fdba74,#d97706 60%,#7c2d12); }
+.pod-face { display: flex; justify-content:center; padding-top: 14px; font-family:'Fredoka', system-ui; font-weight:700; font-size:34px; color:rgba(0,0,0,.5); box-shadow:inset 0 2px 0 rgba(255,255,255,.6); }
+.srow { display: flex; align-items:center; gap: 12px; padding: 10px 14px; border-radius: 14px; background:rgba(7,5,20,.5); border:1px solid rgba(255,255,255,.07); border-left:4px solid var(--rc,#3b3566); transition:.15s; }
+.srow:hover { background:rgba(40,30,90,.5); }
+.srow.first { border-color:rgba(251,191,36,.45); border-left-color:#fbbf24; }
+.rank { min-width:38px; height:30px; border-radius:99px; display: flex; align-items:center; justify-content:center; font-family: 'Fredoka', system-ui; font-weight:700; font-size: 13px; background:rgba(255,255,255,.1); color:#b6b1e0; }
+.r1{background:#fbbf24;color:#1c1917}.r2{background:#cbd5e1;color:#1c1917}.r3{background:#d97706;color:#fff}
+.av { font-size:25px; width:38px; text-align:center; }
+.sname { font-weight:800; font-size:14.5px; }
+.bar { width: 120px; height:9px; border-radius:99px; background:rgba(255,255,255,.1); overflow:hidden; }
+.bar i, .xp i { display:block; height: 100%; width:0; border-radius:99px; background:linear-gradient(90deg,#6c5ce7,#fd79a8,#fdcb6e); transition:width 1s cubic-bezier(.2,.8,.2,1); }
+.xp { height: 13px; border-radius:99px; background:rgba(255,255,255,.1); overflow:hidden; }
+.starpill { font-family:'Fredoka', system-ui; font-weight:700; font-size: 15px; color:#fde68a; padding:4px 11px; border-radius: 10px; background:rgba(251,191,36,.1); border:1px solid rgba(251,191,36,.3); white-space:nowrap; }
+.scroll { overflow-y:auto; padding-right:4px; }
+.feed { padding:10px 12px; border-radius: 12px; background:rgba(7,5,20,.5); border:1px solid rgba(255,255,255,.06); font-size: 13px; display: flex; gap:10px; }
+.box { border-radius: 16px; padding: 14px; background:rgba(7,5,20,.6); border:1px solid rgba(255,255,255,.09); text-align:center; }
+.bignum { font-family:'Fredoka', system-ui; font-weight:700; font-size:40px; line-height:1.1; }
+.tile { display:block; width: 100%; text-align:left; border:0; color:#fff; padding:22px; border-radius:22px; cursor:pointer; }
+.prize-ic { width:64px; height:64px; border-radius: 18px; background:rgba(255,255,255,.08); display:flex; align-items:center; justify-content:center; font-size:36px; margin:0 auto 12px; transform:translateZ(40px); }
+.pill-status { display:inline-flex; align-items:center; gap:7px; padding:7px 12px; border-radius:11px; font-size:12.5px; font-weight:700; background:rgba(7,5,20,.6); border:1px solid var(--line); }
+.notice { padding: 13px 15px; border-radius: 14px; font-size:13px; background:rgba(251,191,36,.09); border:1px solid rgba(251,191,36,.4); color:#fde68a; }
+.notice.bad { background:rgba(244,63,94,.1); border-color:rgba(244,63,94,.5); color:#fecdd3; }
+.steps { margin:8px 0 0; padding-left:20px; display:grid; gap:7px; font-size:13px; color:#d4d0f5; }
+.qrbox { background:#fff; padding: 12px; border-radius: 16px; box-shadow:0 0 40px rgba(139,124,246,.4); flex-shrink:0; }
+.star-pop { position:fixed; left:50%; top:42%; z-index:120; pointer-events:none; font-family:'Fredoka', system-ui; font-weight:700; font-size:min(20vw, 140px); color:#fde68a; white-space:nowrap; text-shadow:0 0 40px rgba(253,203,110,.9),0 8px 0 #b45309; animation:starPop 1.3s cubic-bezier(.2,1.4,.4,1) forwards; }
+@keyframes starPop {0%{transform:translate(-50%,-50%) scale(.2) rotate(-20deg);opacity:0} 25%{transform:translate(-50%,-50%) scale(1.15) rotate(5deg);opacity:1} 70%{transform:translate(-50%,-55%) scale(1);opacity:1} 100%{transform:translate(-50%,-120%) scale(.8);opacity:0} }
+.levelup { position:fixed; inset:0; z-index: 125; display: flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; background:rgba(7,5,20,.8); backdrop-filter:blur(6px); animation:fadeIn .3s ease; pointer-events:none; }
+.levelup .big { font-size: 110px; animation:spin 1.6s ease-out 1; }
+@keyframes spin { to { transform:rotateY(360deg); } }
+@keyframes fadeIn {from{opacity:0} to {opacity:1}}
+@keyframes rise {from{opacity:0;transform:translateY(12px)} to {opacity:1; transform:none}}
+.wrap > * { animation:rise .3s ease both; }
+.wrap.quiet > * { animation:none; }
+#modal { display:none; position:fixed; inset:0; z-index: 100; align-items:center; justify-content:center; padding: 16px; background:rgba(7,5,20,.82); backdrop-filter:blur(6px); }
+#modal.open { display: flex; }
+#modal-content { max-width: 560px; width: 100%; max-height:90vh; overflow-y:auto; }
+#toast-container { position:fixed; bottom:20px; right:20px; z-index: 130; display: flex; flex-direction:column; gap:8px; pointer-events:none; }
+.toast { color:#fff; font-size: 13px; font-weight:800; padding:11px 16px; border-radius: 12px; border:1px solid rgba(255,255,255,.25); max-width:320px; box-shadow:0 10px 30px rgba(0,0,0,.4); transition:.3s; }
+#fatal { position:fixed; left: 12px; right: 12px; bottom: 12px; z-index:200; }
+#projector { position:fixed; inset:0; z-index:90; background:radial-gradient(80% 60% at 50% 0%,#241a5e,#070514 70%); overflow:auto; padding: 18px 28px 40px; }
+.proj-bar { display: flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+.proj-title { font-size:clamp(34px, 6vw, 76px); font-weight:700; text-align:center; margin-top:6px; }
+.proj-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px 24px; max-width:1100px; margin:18px auto 0; }
+.proj-grid .srow { font-size:1.15em; }
+.proj-qr { display: flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:40px; margin-top:20px; }
+.qr-board { background:#fff; padding:22px; border-radius:30px; box-shadow:0 0 90px rgba(139,124,246,.7); }
+.bigcode { font-family:ui-monospace, Consolas, Menlo, monospace; font-weight:800; font-size:clamp(46px, 9vw, 120px); letter-spacing:.12em; color:#fde68a; text-shadow:0 0 40px rgba(251,191,36,.6); }
+.proj .pod-avatar { width:88px; height:88px; font-size:46px; } .proj .p1.pod-avatar { width: 110px; height: 110px; font-size:58px; }
+.proj .stage3d { max-width:860px; } .proj .pod-person { font-size:1.2em; }
+@media (max-width:760px) { .proj-grid{grid-template-columns:1fr;} #projector{padding:14px;} }
+@media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation:none !important; transition:none !important; } }
 </style>
 </head>
 <body>
 <canvas id="bg3d"></canvas>
 <div class="aurora"></div>
-
 <header class="topbar">
-  <div class="topin">
-    <div class="logo" onclick="switchView('leaderboard')">
-      <div class="logo-badge">🏆</div>
-      <div><div class="brand disp neon">Star Champions</div></div>
-    </div>
-    <div class="nav">
-      <button class="nav-btn" id="nav-leaderboard" onclick="switchView('leaderboard')"><span data-ic="trophy"></span>Leaderboard</button>
-      <button class="nav-btn" id="nav-student" onclick="openStudent()"><span data-ic="user"></span>Student</button>
-      <button class="nav-btn" id="nav-teacher" onclick="openTeacher()"><span data-ic="monitor"></span>Teacher</button>
-      <button class="nav-btn status" id="save-badge" onclick="openSaveModal()"><i class="dot" id="save-dot"></i><span id="save-text">Starting…</span></button>
-    </div>
-  </div>
+<div class="topin">
+<div class="logo" onclick="switchView('leaderboard')">
+<div class="logo-badge">⭐</div>
+<div><div class="brand disp neon">Star Champions</div></div>
+</div>
+<div class="nav">
+<button class="nav-btn" id="nav-leaderboard" onclick="switchView('leaderboard')"><span data-ic="trophy"></span>Leaderboard</button>
+<button class="nav-btn" id="nav-student" onclick="openStudent()"><span data-ic="user"></span>Student</button>
+<button class="nav-btn" id="nav-teacher" onclick="openTeacher()"><span data-ic="monitor"></span>Teacher</button>
+<button class="nav-btn status" id="save-badge" onclick="openSaveModal()"><i class="dot" id="save-dot"></i><span id="save-text">Starting...</span></button>
+</div>
+</div>
 </header>
-
 <main id="app-content" class="wrap"></main>
 <div id="projector" class="hide"></div>
 <div id="toast-container"></div>
 <div id="modal" onclick="if(event.target===this)closeModal()"><div id="modal-content" class="card"></div></div>
-<input type="file" id="json-import-input" accept=".json,application/json" class="hide" onchange="handleImportFile(event)">
-
+<input type="file" id="json-import-input" accept=".json, application/json" class="hide" onchange="handleImportFile(event)">
 <script>
-/* ============================================================
-   OPTIONAL: paste your Firebase config here ONCE and the plain
-   website address works on every device with no extra link.
-   (Teacher Hub > Cloud & Backup writes the exact line for you.)
-   ============================================================ */
-const FIREBASE_CONFIG = {"apiKey":"AIzaSyCuQMk_lirsTS1UrWduG6ioxzjye7jstsU","authDomain":"stars-93a6b.firebaseapp.com","projectId":"stars-93a6b","storageBucket":"stars-93a6b.firebasestorage.app","messagingSenderId":"377533311863","appId":"1:377533311863:web:29745a7678748b0a358f72"};
-/* ============================================================ */
-
 const IC = {
-  trophy:'<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
-  user:'<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
-  monitor:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
-  users:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
-  gift:'<path d="M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>',
-  dice:'<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1"/><circle cx="16" cy="8" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="8" cy="16" r="1"/><circle cx="16" cy="16" r="1"/>',
-  list:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
-  sliders:'<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
-  lock:'<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
-  rotate:'<path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/>',
-  trash:'<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
-  key:'<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>',
-  back:'<path d="M19 12H5M12 19l-7-7 7-7"/>',
-  download:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
-  upload:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>',
-  x:'<path d="M18 6L6 18M6 6l12 12"/>',
-  folder:'<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
-  cloud:'<path d="M18 10h-1.3A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>',
-  plus:'<path d="M12 5v14M5 12h14"/>',
-  copy:'<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
-  cast:'<path d="M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6M2 12a9 9 0 0 1 8 8M2 16a5 5 0 0 1 4 4M2 20h.01"/>'
+trophy:'<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
+user:'<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+monitor:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+users:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+gift:'<path d="M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>',
+dice:'<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1"/><circle cx="16" cy="8" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="8" cy="16" r="1"/><circle cx="16" cy="16" r="1"/>',
+list:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+sliders:'<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
+lock:'<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+rotate:'<path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/>',
+trash:'<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
+key:'<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>',
+back:'<path d="M19 12H5M12 19l-7-7 7-7"/>',
+download:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
+upload:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>',
+x:'<path d="M18 6L6 18M6 6l12 12"/>',
+folder:'<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
+cloud:'<path d="M18 10h-1.3A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>',
+plus:'<path d="M12 5v14M5 12h14"/>',
+copy:'<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+cast:'<path d="M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6M2 12a9 9 0 0 1 8 8M2 16a5 5 0 0 1 4 4M2 20h.01"/>'
 };
 const ic = (n, s = 16) => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n] || ''}</svg>`;
-
-/* ===== STORAGE (this device): localStorage + IndexedDB + tab memory ===== */
+/* ===== LOCAL STORAGE ===== */
 const Store = (() => {
-  const KEY = 'StarCentral_V4', LEGACY = 'ClassroomStarRewards_V3', DBN = 'StarCentralDB', TAG = 'SC4::';
-  const caps = { local:false, idb:false, tab:false };
-  let db = null;
-  const parse = s => { try { const o = JSON.parse(s); return (o && Array.isArray(o.students)) ? o : null; } catch (e) { return null; } };
-  function openDB() { return new Promise(res => { try { const r = indexedDB.open(DBN, 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => res(null); r.onblocked = () => res(null); } catch (e) { res(null); } }); }
-  function rawGet(k) { return new Promise(res => { if (!db) return res(null); try { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); } catch (e) { res(null); } }); }
-  function rawPut(k, v) { return new Promise(res => { if (!db) return res(false); try { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => res(true); t.onerror = () => res(false); } catch (e) { res(false); } }); }
-  async function init() {
-    try { localStorage.setItem('__sc_t', '1'); localStorage.removeItem('__sc_t'); caps.local = true; } catch (e) {}
-    try { db = await openDB(); caps.idb = !!db; } catch (e) {}
-    try { window.name = window.name; caps.tab = true; } catch (e) {}
-  }
-  async function load() {
-    const c = [];
-    if (caps.local) { try { const s = localStorage.getItem(KEY); if (s) c.push(parse(s)); } catch (e) {} }
-    if (caps.idb) { const s = await rawGet(KEY); if (s) c.push(parse(s)); }
-    try { if (typeof window.name === 'string' && window.name.startsWith(TAG)) c.push(parse(window.name.slice(TAG.length))); } catch (e) {}
-    let best = c.filter(Boolean).sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0))[0] || null;
-    if (!best && caps.local) { try { const old = parse(localStorage.getItem(LEGACY)); if (old) best = old; } catch (e) {} }
-    return best;
-  }
-  function save(obj) {
-    const str = JSON.stringify(obj);
-    if (caps.local) { try { localStorage.setItem(KEY, str); } catch (e) { caps.local = false; } }
-    if (caps.idb && db) rawPut(KEY, str);
-    try { window.name = TAG + str; } catch (e) {}
-  }
-  return { init, load, save, caps, KEY, parse, rawGet, rawPut };
+const KEY = 'StarCentral_V4', LEGACY = 'ClassroomStarRewards_V3', DBN = 'StarCentralDB', TAG = 'SC4::';
+const caps = { local:false, idb:false, tab:false };
+let db = null;
+const parse = s => { try { const o = JSON.parse(s); return (o && Array.isArray(o.students)) ? o: null; } catch (e) { return null; } };
+function openDB() { return new Promise(res => { try { const r = indexedDB.open(DBN, 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => res(null); r.onblocked = () => res(null); } catch (e) { res(null); } }); }
+function rawGet(k) { return new Promise(res => { if (!db) return res(null); try { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); } catch (e) { res(null); } }); }
+function rawPut(k, v) { return new Promise(res => { if (!db) return res(false); try { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => res(true); t.onerror = () => res(false); } catch (e) { res(false); } }); }
+async function init() {
+  try { localStorage.setItem('_sc_t', '1'); localStorage.removeItem('_sc_t'); caps.local = true; } catch (e) {}
+  try { db = await openDB(); caps.idb = !!db; } catch (e) {}
+  try { window.name = window.name; caps.tab = true; } catch (e) {}
+}
+async function load() {
+  const c = [];
+  if (caps.local) { try { const s = localStorage.getItem(KEY); if (s) c.push(parse(s)); } catch (e) {} }
+  if (caps.idb) { const s = await rawGet(KEY); if (s) c.push(parse(s)); }
+  try { if (typeof window.name === 'string' && window.name.startsWith(TAG)) c.push(parse(window.name.slice(TAG.length))); } catch (e) {}
+  let best = c.filter(Boolean).sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0))[0] || null;
+  if (!best && caps.local) { try { const old = parse(localStorage.getItem(LEGACY)); if (old) best = old; } catch (e) {} }
+  return best;
+}
+function save(obj) {
+  const str = JSON.stringify(obj);
+  if (caps.local) { try { localStorage.setItem(KEY, str); } catch (e) { caps.local = false; } }
+  if (caps.idb && db) rawPut(KEY, str);
+  try { window.name = TAG + str; } catch (e) {}
+}
+return { init, load, save, caps, KEY, parse, rawGet, rawPut };
 })();
-
-/* ===== STATE ===== */
+/* ===== STATE & CONSTANTS ===== */
 const DEFAULT_PRIZES = () => [
-  { id:'prz-1', title:'Homework Pass', cost:10, stock:20, icon:'🎫', description:'Skip one homework assignment of your choice.' },
-  { id:'prz-2', title:'Front Row Seat', cost:15, stock:5, icon:'🪑', description:'Pick any seat in class for a full week!' },
-  { id:'prz-3', title:'10 Min Extra Recess', cost:25, stock:10, icon:'🛝', description:'Enjoy 10 bonus minutes of outdoor break.' },
-  { id:'prz-4', title:'Pick the Music', cost:20, stock:8, icon:'🎧', description:'You choose the class playlist for one period.' },
-  { id:'prz-5', title:'Sit With a Friend', cost:12, stock:10, icon:'🧑‍🤝‍🧑', description:'Choose a partner to sit next to for a week.' }
+{ id:'prz-1', title: 'Homework Pass', cost: 10, stock:20, icon:'🎟️', description: 'Skip one homework assignment of your choice.' },
+{ id:'prz-2', title: 'Front Row Seat', cost: 15, stock:5, icon:'🪑', description: 'Pick any seat in class for a full week!' },
+{ id:'prz-3', title:'10 Min Extra Recess', cost:25, stock:10, icon:'⚽', description: 'Enjoy 10 bonus minutes of outdoor break.' },
+{ id:'prz-4', title: 'Pick the Music', cost:20, stock:8, icon:'🎧', description: 'You choose the class playlist for one period.' },
+{ id:'prz-5', title: 'Sit With a Friend', cost: 12, stock:10, icon:'🤝', description: 'Choose a partner to sit next to for a week.' }
 ];
-const AVATARS = ['🐶','🐱','🦊','🐻','🐼','🐨','🦁','🐯','🐸','🐵','🦄','🐲','🦖','🐙','🦈','🐧','🦉','🦋','🐢','🐬','🚀','🎮','🎨','🎸','⚽','🏀','🛹','🎧','👾','🤖','👽','🥷','🧙','🦸','🧜','🔥','⚡','🌈','🍕','🍩'];
+const AVATARS = ['🚀', '🦊', '🐱', '🐼', '🐯', '🦁', '🐸', '🦄', '🐲', '🤖', '👾', '⭐', '🌈', '⚡', '🔥', '💎'];
 const LEVELS = [
-  { min:0, name:'Rookie', icon:'🥚' }, { min:5, name:'Sparkler', icon:'✨' }, { min:15, name:'Rising Star', icon:'🌟' },
-  { min:30, name:'All-Star', icon:'🚀' }, { min:50, name:'Champion', icon:'🏆' }, { min:80, name:'Legend', icon:'🐉' }, { min:120, name:'Mythic', icon:'👑' }
+{ min:0, name: 'Rookie', icon:'🌱'}, {min:5, name: 'Sparkler', icon:'✨'}, { min:15, name:'Rising Star', icon:'⭐'},
+{ min:30, name: 'All-Star', icon:'🌟' }, { min:50, name: 'Champion', icon:'🏆'}, { min:80, name:'Legend', icon:'👑' },
+{ min: 120, name: 'Mythic', icon:'🔥'}
 ];
-const RULES_TEXT = "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /starChampionsRooms/{room} {\n      allow read, write: if true;\n    }\n  }\n}";
-
-let state = { students:[], prizes:DEFAULT_PRIZES(), currentQrToken:null, activity:[], redemptions:[], settings:{ multiplier:1, passB64:null, passHash:null }, savedAt:0 };
+let state = { students: [], prizes: DEFAULT_PRIZES(), currentQrToken:null, activity:[], redemptions:[], settings:{ multiplier: 1, passB64:null, passHash:null }, savedAt:0 };
 let ui = { view:'leaderboard', tab:'roster', teacher:false, activeStudentId:null, projector:null, picked:null };
-const Cloud = { configured:false, cfg:null, room:'CLASS-1', on:false, exists:false, error:null, pub:false };
+const Cloud = { configured:true, cfg:null, room: 'CLASS-1', on:false, exists:false, error:null, pub:false };
 const FileSave = { handle:null, status:'off', timer:null, last:null, supported:(typeof window.showSaveFilePicker === 'function') };
 let html5QrScanner = null, claiming = false, pendingConfirm = null, lastSaveTime = null;
-
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 const clock = t => new Date(t).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' });
 const SAFE = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-function newCode() { let p = ''; for (let i = 0; i < 6; i++) p += SAFE[Math.floor(Math.random() * SAFE.length)]; return p; }
+function newCode() { let p=''; for (let i=0; i<6; i++) p += SAFE[Math.floor(Math.random()*SAFE.length)]; return p; }
 function pinFor(st) { const used = new Set(st.students.map(s => s.pin)); let p; do { p = newCode(); } while (used.has(p)); return p; }
 function addLog(st, icon, msg) { st.activity.unshift({ t:Date.now(), icon, msg }); st.activity = st.activity.slice(0, 30); }
 function levelInfo(total) {
@@ -328,67 +343,27 @@ function levelInfo(total) {
 function getSortedStudents() { return [...state.students].sort((a, b) => b.totalEarned - a.totalEarned || b.stars - a.stars || a.name.localeCompare(b.name)); }
 function getStudentRank(id) { const i = getSortedStudents().findIndex(s => s.id === id); return i === -1 ? state.students.length : i + 1; }
 function activeStudent() { return state.students.find(s => s.id === ui.activeStudentId); }
-
 function getPayload() { return { version:6, students:state.students, prizes:state.prizes, currentQrToken:state.currentQrToken, activity:state.activity, redemptions:state.redemptions, settings:state.settings, savedAt:state.savedAt }; }
 function applyData(o) {
-  state.students = (o.students || []).map(s => ({ id:s.id, name:String(s.name || 'Student'), pin:String(s.pin || newCode()), stars:s.stars | 0, totalEarned:Math.max(s.totalEarned | 0, s.stars | 0), avatar:s.avatar || '🐶' }));
-  state.prizes = Array.isArray(o.prizes) ? o.prizes : DEFAULT_PRIZES();
+  state.students = (o.students || []).map(s => ({ id:s.id, name:String(s.name || 'Student'), pin:String(s.pin || newCode()), stars:s.stars | 0, totalEarned: Math.max(s.totalEarned | 0, s.stars | 0), avatar:s.avatar || '⭐' }));
+  state.prizes = Array.isArray(o.prizes)? o.prizes: DEFAULT_PRIZES();
   state.currentQrToken = o.currentQrToken || state.currentQrToken || newCode();
-  state.activity = Array.isArray(o.activity) ? o.activity : [];
-  state.redemptions = Array.isArray(o.redemptions) ? o.redemptions : [];
-  state.settings = Object.assign({ multiplier:1, passB64:null, passHash:null }, o.settings || {});
+  state.activity = Array.isArray(o.activity)? o.activity: [];
+  state.redemptions = Array.isArray(o.redemptions)? o.redemptions: [];
+  state.settings = Object.assign({ multiplier: 1, passB64:null, passHash:null}, o.settings || {});
   state.savedAt = o.savedAt || 0;
 }
 function saveState() { state.savedAt = Date.now(); Store.save(getPayload()); lastSaveTime = state.savedAt; scheduleFileWrite(); updateSaveBadge(); }
-
-/* ===== CLOUD CONFIG: baked line > link (#cfg=...) > remembered on this device ===== */
-function b64e(o) { return btoa(unescape(encodeURIComponent(JSON.stringify(o)))); }
-function b64d(s) { return JSON.parse(decodeURIComponent(escape(atob(s)))); }
-function resolveCloudConfig() {
-  let pick = FIREBASE_CONFIG ? { cfg:FIREBASE_CONFIG, room:'CLASS-1' } : null, fromHash = null;
-  try {
-    const m = (location.hash || '').match(/cfg=([^&]+)/);
-    if (m) {
-      const o = b64d(decodeURIComponent(m[1]));
-      if (o && o.cfg && o.cfg.projectId && o.cfg.apiKey) fromHash = o;
-      try { history.replaceState(null, '', location.href.split('#')[0]); } catch (e) {}
-    }
-  } catch (e) {}
-  if (fromHash) { try { localStorage.setItem('sc_fbcfg', JSON.stringify(fromHash)); } catch (e) {} if (!pick) pick = fromHash; }
-  if (!pick) { try { const o = JSON.parse(localStorage.getItem('sc_fbcfg') || 'null'); if (o && o.cfg && o.cfg.projectId) pick = o; } catch (e) {} }
-  Cloud.cfg = pick ? pick.cfg : null; Cloud.room = (pick && pick.room) || 'CLASS-1'; Cloud.configured = !!Cloud.cfg;
-}
-function studentLink() { return location.href.split('#')[0] + '#cfg=' + encodeURIComponent(b64e({ cfg:Cloud.cfg, room:Cloud.room })); }
-function parseFirebaseConfig(text) {
-  const ok = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId', 'measurementId'], out = {}, re = /["']?([A-Za-z]+)["']?\s*:\s*["']([^"']+)["']/g;
-  let m; while ((m = re.exec(text || ''))) if (ok.includes(m[1])) out[m[1]] = m[2];
-  return (out.apiKey && out.projectId && out.appId) ? out : null;
-}
-function connectCloudWizard() {
-  const t = $('fb-config-input'), cfg = parseFirebaseConfig(t ? t.value : '');
-  if (!cfg) { showToast('Could not find apiKey, projectId and appId. Paste the whole firebaseConfig block.', 'error'); return; }
-  const pack = { cfg, room:'CLASS-1' };
-  try { localStorage.setItem('sc_fbcfg', JSON.stringify(pack)); } catch (e) {}
-  location.hash = '#cfg=' + encodeURIComponent(b64e(pack)); location.reload();
-}
-function disconnectCloud() {
-  askConfirm('Disconnect this device from the cloud class? Your cloud data stays safe, and this device goes back to local-only mode.', () => {
-    try { localStorage.removeItem('sc_fbcfg'); } catch (e) {}
-    try { history.replaceState(null, '', location.href.split('#')[0]); } catch (e) {}
-    location.reload();
-  });
-}
-
-/* ===== mutate(): every change goes through here ===== */
+/* ===== MUTATE CENTRAL ===== */
 async function mutate(fn) {
   if (Cloud.configured) {
-    if (!Cloud.on || !window.CloudMutate) { showToast('Not connected to the class yet. Check the internet and try again.', 'error'); return { error:'offline' }; }
+    if (!Cloud.on || !window.CloudMutate) { showToast('Not connected to the class yet. Check connection.', 'error'); return { error:'offline' }; }
     try {
       const r = await window.CloudMutate(fn);
       if (r.result && r.result.error) return r.result;
       if (r.st) { applyData(r.st); Store.save(getPayload()); lastSaveTime = Date.now(); scheduleFileWrite(); updateSaveBadge(); }
       return r.result || { ok:true };
-    } catch (e) { console.error(e); showToast('Cloud save failed. Check the internet and try again.', 'error'); return { error:'cloud-fail' }; }
+    } catch (e) { console.error(e); showToast('Cloud save failed.', 'error'); return { error:'cloud-fail' }; }
   }
   const res = fn(state);
   if (res && res.error) return res;
@@ -396,23 +371,22 @@ async function mutate(fn) {
   return res || { ok:true };
 }
 function explainError(res) {
-  const m = { 'no-class':'Your teacher has not started the class yet.', 'bad-code':'That code is not valid or already used. Scan the one on screen!', 'no-student':'Could not find your account.', offline:'Not connected. Try again in a moment.', 'cloud-fail':'Could not save. Try again.' };
-  return m[res.error] || 'Something went wrong. Try again.';
+  const m = { 'no-class': 'Class data not found.', 'bad-code': 'Code is invalid or expired!', 'no-student': 'Student account not found.', offline: 'Not connected to backend.', 'cloud-fail': 'Database write failed.' };
+  return m[res.error] || 'An unexpected error occurred.';
 }
-
-/* ===== optional: also save a copy to a file on the teacher's computer (Chrome/Edge) ===== */
+/* ===== OPTIONAL FILE WRITER ===== */
 async function fileInit() {
   if (!FileSave.supported) return;
   const h = await Store.rawGet('fileHandle'); if (!h) return; FileSave.handle = h;
-  try { FileSave.status = (await h.queryPermission({ mode:'readwrite' })) === 'granted' ? 'on' : 'needs-permission'; } catch (e) { FileSave.status = 'needs-permission'; }
+  try { FileSave.status = (await h.queryPermission({ mode:'readwrite' })) === 'granted' ? 'on': 'needs-permission'; } catch (e) { FileSave.status = 'needs-permission'; }
 }
 async function fileLink() {
-  if (!FileSave.supported) { showToast('This browser cannot do this. Use Chrome or Edge on a computer, or Download Backup.', 'info'); return; }
+  if (!FileSave.supported) { showToast('Browser does not support direct file saving.', 'info'); return; }
   try {
-    const h = await window.showSaveFilePicker({ suggestedName:'StarChampions-data.json', types:[{ description:'Star Champions data', accept:{ 'application/json':['.json'] } }] });
+    const h = await window.showSaveFilePicker({ suggestedName: 'StarChampions-data.json', types:[{ description: 'JSON File', accept: { 'application/json': ['.json'] } }] });
     FileSave.handle = h; FileSave.status = 'on'; await Store.rawPut('fileHandle', h); await fileWrite();
-    showToast('Linked! Every change also saves to that file.', 'success'); updateSaveBadge(); refreshSaveCenter();
-  } catch (e) { if (e && e.name !== 'AbortError') showToast('This browser blocked file saving. Use Download Backup.', 'info'); }
+    showToast('Linked! Changes auto-save to file.', 'success'); updateSaveBadge(); refreshSaveCenter();
+  } catch (e) { if (e && e.name !== 'AbortError') showToast('File access denied.', 'info'); }
 }
 async function fileWrite() {
   if (!FileSave.handle || FileSave.status !== 'on') return;
@@ -420,17 +394,14 @@ async function fileWrite() {
   catch (e) { FileSave.status = 'needs-permission'; updateSaveBadge(); refreshSaveCenter(); }
 }
 function scheduleFileWrite() { if (!FileSave.handle) return; clearTimeout(FileSave.timer); FileSave.timer = setTimeout(fileWrite, 700); }
-async function fileReconnect() {
-  try { const p = await FileSave.handle.requestPermission({ mode:'readwrite' }); if (p === 'granted') { FileSave.status = 'on'; await fileWrite(); showToast('Reconnected to your save file', 'success'); } }
-  catch (e) { showToast('Could not reconnect. Link the file again.', 'error'); }
-  updateSaveBadge(); refreshSaveCenter();
-}
-
 function updateSaveBadge() {
   const t = $('save-text'), d = $('save-dot'); if (!t) return;
   let txt, cls = '';
-  if (Cloud.configured) { if (Cloud.on) txt = 'Synced to all devices'; else if (Cloud.error) { txt = 'Cloud error'; cls = 'bad'; } else { txt = 'Connecting…'; cls = 'warn'; } }
-  else { txt = 'This device only'; cls = 'warn'; }
+  if (Cloud.configured) {
+    if (Cloud.on) txt = 'Supabase Sync';
+    else if (Cloud.error) { txt = 'Cloud Error'; cls = 'bad'; }
+    else { txt = 'Connecting...'; cls = 'warn'; }
+  } else { txt = 'Local Device Only'; cls = 'warn'; }
   t.textContent = txt; d.className = 'dot ' + cls;
 }
 function persistSession() { try { sessionStorage.setItem('sc_ui', JSON.stringify({ view:ui.view, tab:ui.tab, teacher:ui.teacher, activeStudentId:ui.activeStudentId })); } catch (e) {} }
@@ -446,8 +417,7 @@ function restoreSession() {
     ui.view = v;
   } catch (e) {}
 }
-
-/* ===== 3D background ===== */
+/* ===== 3D BACKGROUND ENGINE ===== */
 const bg = { boost:0, mx:0, my:0 };
 function initBackground() {
   if (typeof THREE === 'undefined') return;
@@ -461,9 +431,9 @@ function initBackground() {
     const p1 = new THREE.PointLight(0xfd79a8, 1.3, 40); p1.position.set(-8, 4, 2); scene.add(p1);
     const p2 = new THREE.PointLight(0x6c5ce7, 1.5, 40); p2.position.set(8, -4, 2); scene.add(p2);
     const shape = new THREE.Shape();
-    for (let i = 0; i < 10; i++) { const r = i % 2 ? .42 : 1, a = i * Math.PI / 5 + Math.PI / 2, x = Math.cos(a) * r, y = Math.sin(a) * r; if (i) shape.lineTo(x, y); else shape.moveTo(x, y); }
+    for (let i = 0; i < 10; i++) { const r = i % 2 === 0 ? .42 : 1, a = i * Math.PI / 5 + Math.PI / 2, x = Math.cos(a) * r, y = Math.sin(a) * r; if (i) shape.lineTo(x, y); else shape.moveTo(x, y); }
     shape.closePath();
-    const starGeo = new THREE.ExtrudeGeometry(shape, { depth:.35, bevelEnabled:true, bevelThickness:.1, bevelSize:.08, bevelSegments:3 }); starGeo.center();
+    const starGeo = new THREE.ExtrudeGeometry(shape, { depth: .35, bevelEnabled:true, bevelThickness:.1, bevelSize:.08, bevelSegments:3 }); starGeo.center();
     const geos = [starGeo, new THREE.TorusGeometry(.6, .22, 12, 28), new THREE.OctahedronGeometry(.7), new THREE.IcosahedronGeometry(.6)];
     const colors = [0xfdcb6e, 0xfd79a8, 0x6c5ce7, 0x00cec9, 0x74b9ff, 0xff7675], meshes = [], count = reduced ? 12 : 24;
     for (let i = 0; i < count; i++) {
@@ -475,7 +445,7 @@ function initBackground() {
       scene.add(m); meshes.push(m);
     }
     const n = reduced ? 120 : 320, arr = new Float32Array(n * 3);
-    for (let i = 0; i < n * 3; i += 3) { arr[i] = (Math.random() - .5) * 40; arr[i + 1] = (Math.random() - .5) * 24; arr[i + 2] = -Math.random() * 18; }
+    for (let i = 0; i < n * 3; i += 3) { arr[i] = (Math.random() - .5) * 40; arr[i + 1] = (Math.random() - .5) * 24; arr[i + 2] = Math.random() * 18; }
     const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(arr, 3));
     const pts = new THREE.Points(pg, new THREE.PointsMaterial({ color:0xffffff, size:.045, transparent:true, opacity:.7 })); scene.add(pts);
     function resize() { renderer.setSize(window.innerWidth, window.innerHeight, false); camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); }
@@ -489,7 +459,7 @@ function initBackground() {
       camera.position.x += (bg.mx * 1.3 - camera.position.x) * .03; camera.position.y += (bg.my * .9 - camera.position.y) * .03; camera.lookAt(0, 0, 0);
       renderer.render(scene, camera);
     })();
-  } catch (e) { console.warn('3D background unavailable', e); }
+  } catch (e) { console.warn('3D Engine context failure', e); }
 }
 let lastTilt = null;
 function bindFx() {
@@ -501,42 +471,33 @@ function bindFx() {
     if (!el) { lastTilt = null; return; }
     const r = el.getBoundingClientRect(), px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height, max = +el.dataset.tilt || 10;
     el.style.transform = `perspective(900px) rotateX(${((.5 - py) * max).toFixed(2)}deg) rotateY(${((px - .5) * max).toFixed(2)}deg) scale(1.025)`;
-    el.style.setProperty('--mx', (px * 100) + '%'); el.style.setProperty('--my', (py * 100) + '%'); lastTilt = el;
+    el.style.setProperty('--mx', (px * 100) + '%'); el.style.setProperty('--my', (py * 100) + '%');
+    lastTilt = el;
   });
   document.addEventListener('mouseleave', () => { if (lastTilt) lastTilt.style.transform = ''; lastTilt = null; });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && ui.projector) closeProjector(); });
 }
-
-/* ===== boot ===== */
+/* ===== APP BOOT ===== */
 function showFatal(msg) {
   let f = $('fatal'); if (!f) { f = document.createElement('div'); f.id = 'fatal'; document.body.appendChild(f); }
-  f.innerHTML = `<div class="notice bad"><b>Something broke:</b> ${esc(msg)}<br><span class="tiny">Take a screenshot of this and send it to get it fixed.</span></div>`;
+  f.innerHTML = `<div class="notice bad"><b>System Alert:</b> ${esc(msg)}<br><span class="tiny">Take a screenshot to diagnose runtime errors.</span></div>`;
 }
-window.addEventListener('error', e => showFatal(e.message || 'Unknown error'));
+window.addEventListener('error', e => showFatal(e.message || 'Script Execution Error'));
 window.addEventListener('unhandledrejection', e => showFatal((e.reason && e.reason.message) || String(e.reason)));
-
 async function boot() {
   document.querySelectorAll('[data-ic]').forEach(e => { e.innerHTML = ic(e.dataset.ic, 16); });
   await Store.init();
-  resolveCloudConfig();
   const saved = await Store.load();
   if (saved) applyData(saved);
   if (!state.currentQrToken) state.currentQrToken = newCode();
   await fileInit();
   restoreSession(); initBackground(); bindFx();
   updateNav(); renderView(ui.view); updateSaveBadge();
-  if (!saved && !Cloud.configured) saveState(); else if (saved) lastSaveTime = state.savedAt || Date.now();
-  if (Cloud.configured) connectCloud();
-  window.addEventListener('storage', e => {
-    if (e.key !== Store.KEY || !e.newValue || Cloud.configured) return;
-    const o = Store.parse(e.newValue);
-    if (o && (o.savedAt || 0) > state.savedAt) { applyData(o); updateSaveBadge(); softRerender(); }
-  });
+  connectCloud();
 }
 window.addEventListener('DOMContentLoaded', boot);
-
 async function connectCloud() {
-  if (!window.CloudInit) { Cloud.error = 'cloud engine blocked'; updateSaveBadge(); softRerender(); return; }
+  if (!window.CloudInit) { Cloud.error = 'Cloud Client Missing'; updateSaveBadge(); softRerender(); return; }
   await window.CloudInit(Cloud.cfg, Cloud.room, (exists, data, err) => {
     const wasOn = Cloud.on;
     Cloud.on = !err; Cloud.exists = exists; Cloud.error = err || null;
@@ -546,14 +507,12 @@ async function connectCloud() {
     if (Cloud.on && !exists && ui.teacher && !Cloud.pub) { Cloud.pub = true; publishToCloud(); }
     if (changed || wasOn !== Cloud.on) softRerender();
   });
-  if (!Cloud.on) { updateSaveBadge(); softRerender(); }
 }
 async function publishToCloud() {
-  if (!window.CloudPublish || !Cloud.on) { showToast('Cloud is not connected.', 'error'); return; }
-  try { await window.CloudPublish(getPayload()); Cloud.exists = true; showToast('Your class is now live on every device!', 'success'); refreshSaveCenter(); }
-  catch (e) { showToast('Could not publish: ' + (e.code || e.message), 'error'); }
+  if (!window.CloudPublish || !Cloud.on) { showToast('Backend database offline.', 'error'); return; }
+  try { await window.CloudPublish(getPayload()); Cloud.exists = true; showToast('Class data initialized live!', 'success'); refreshSaveCenter(); }
+  catch (e) { showToast('Sync failed: ' + (e.code || e.message), 'error'); }
 }
-
 function softRerender() {
   if (ui.projector) renderProjector();
   if ($('modal').classList.contains('open')) return;
@@ -563,22 +522,17 @@ function softRerender() {
     renderView(v, true);
     document.querySelectorAll('.scroll').forEach((e, i) => { if (sc[i]) e.scrollTop = sc[i]; });
   } else if (v === 'teacher-dashboard') refreshTeacherLists();
-  else if (v === 'student-login') {
-    const a = $('login-name-input'), b = $('login-pin-input');
-    if (!(a && a.value) && !(b && b.value)) renderView('student-login', true);
-  }
 }
 function killScanner() { if (html5QrScanner) { try { const p = html5QrScanner.clear(); if (p && p.catch) p.catch(() => {}); } catch (e) {} html5QrScanner = null; } }
 function updateNav() {
   const v = ui.view, m = { leaderboard:v === 'leaderboard', student:v.startsWith('student'), teacher:v.startsWith('teacher') };
-  Object.keys(m).forEach(k => { const b = $('nav-' + k); if (b) b.className = 'nav-btn' + (m[k] ? ' active' : ''); });
+  Object.keys(m).forEach(k => { const b = $("nav-" + k); if (b) b.className = 'nav-btn ' + (m[k] ? 'active' : ''); });
 }
 function switchView(name) { killScanner(); closeProjector(); ui.view = name; persistSession(); updateNav(); renderView(name); window.scrollTo(0, 0); }
 function openStudent() { switchView(ui.activeStudentId && activeStudent() ? 'student-dashboard' : 'student-login'); }
 function openTeacher() { switchView(ui.teacher ? 'teacher-dashboard' : 'teacher-auth'); }
 function lockTeacher() { ui.teacher = false; switchView('leaderboard'); showToast('Teacher Hub locked', 'info'); }
 function setTab(t) { ui.tab = t; persistSession(); renderView('teacher-dashboard'); }
-
 function renderView(name, quiet) {
   const c = $('app-content'); c.classList.toggle('quiet', !!quiet);
   try {
@@ -595,7 +549,7 @@ function renderView(name, quiet) {
       default: c.innerHTML = renderLeaderboardView();
     }
     postRender(quiet);
-  } catch (e) { console.error(e); showFatal('Could not draw "' + name + '": ' + e.message); }
+  } catch (e) { console.error(e); showFatal('Render Failed: ' + e.message); }
 }
 function postRender(quiet) {
   document.querySelectorAll('[data-ic]').forEach(e => { if (!e.innerHTML) e.innerHTML = ic(e.dataset.ic, +e.dataset.s || 16); });
@@ -609,45 +563,27 @@ function postRender(quiet) {
 }
 function connNotice() {
   if (!Cloud.configured || Cloud.on) return '';
-  return Cloud.error ? `<div class="notice bad">Cannot reach the class right now (${esc(Cloud.error)}). Check the internet and refresh the page.</div>` : '<div class="notice">Connecting to your class…</div>';
+  return Cloud.error ? `<div class="notice bad">Cloud Engine Offline (${esc(Cloud.error)}). Check configuration.</div>` : '<div class="notice">Connecting to Supabase...</div>';
 }
-
-/* ===== views ===== */
+/* ===== HTML COMPONENT GENERATORS ===== */
 function podiumHTML(top3) {
   const cfg = [{ i:1, cls:'p2', h:150, label:'2nd' }, { i:0, cls:'p1', h:195, label:'1st' }, { i:2, cls:'p3', h:120, label:'3rd' }];
   const cols = cfg.map(c => {
     const s = top3[c.i]; let slices = '';
-    for (let k = 0; k < 9; k++) slices += `<div class="slice" style="transform:translateZ(${-(k + 1) * 4}px);filter:brightness(${(1 - k * .06).toFixed(2)})"></div>`;
-    return `<div class="pod-col ${c.cls}">${s ? `<div class="pod-person">${c.cls === 'p1' ? '<div style="font-size:26px">👑</div>' : ''}<div class="pod-avatar">${s.avatar}</div><div class="b small trunc mt8">${esc(s.name)}</div><div class="gold b small">⭐ ${s.totalEarned}</div></div>` : ''}
-      <div class="pod ${c.cls}" style="height:${c.h}px">${slices}<div class="pod-face">${c.label}</div></div></div>`;
+    for (let k = 0; k < 9; k++) slices += `<div class="slice" style="transform:translateZ(${(k+1)*4}px);filter:brightness(${(1 - k * .06).toFixed(2)})"></div>`;
+    return `<div class="pod-col ${c.cls}">${s ? `<div class="pod-person">${c.cls==='p1'?'<div style="font-size:26px">👑</div>':''}<div class="pod-avatar">${s.avatar}</div><div class="b small trunc mt8">${esc(s.name)}</div><div class="gold b small">⭐ ${s.totalEarned}</div></div>` : ''}<div class="pod ${c.cls}" style="height:${c.h}px">${slices}<div class="pod-face">${c.label}</div></div></div>`;
   }).join('');
   return `<div class="stage-wrap"><div class="beam"></div><div class="floor"></div><div class="stage3d">${cols}</div></div>`;
 }
 function standingRow(s, rank, leader) {
   const gap = leader - s.totalEarned, pct = leader > 0 ? Math.min(100, Math.round(s.totalEarned / leader * 100)) : 0, lv = levelInfo(s.totalEarned);
   const rc = rank === 1 ? '#fbbf24' : rank === 2 ? '#cbd5e1' : rank === 3 ? '#d97706' : '#3b3566';
-  return `<div class="srow ${rank === 1 ? 'first' : ''}" style="--rc:${rc}"><div class="rank r${Math.min(rank, 4)}">#${rank}</div><div class="av">${s.avatar}</div>
-    <div class="f1"><div class="sname trunc">${esc(s.name)}</div><div class="tiny">${lv.cur.icon} ${lv.cur.name} · ${rank === 1 ? '👑 Class Leader' : gap + ' behind 1st'}</div></div>
-    <div class="bar hide-sm"><i data-w="${pct}"></i></div><div class="starpill">⭐ ${s.totalEarned}</div></div>`;
+  return `<div class="srow ${rank===1?'first':''}" style="--rc:${rc}"><div class="rank r${Math.min(rank,4)}">#${rank}</div><div class="av">${s.avatar}</div><div class="f1"><div class="sname trunc">${esc(s.name)}</div><div class="tiny">${lv.cur.icon} ${lv.cur.name} • ${rank===1?'Class Leader':gap+' behind 1st'}</div></div><div class="bar hide-sm"><i data-w="${pct}"></i></div><div class="starpill">⭐ ${s.totalEarned}</div></div>`;
 }
 function renderLeaderboardView() {
   const sorted = getSortedStudents(), top3 = sorted.slice(0, 3), leader = sorted.length ? sorted[0].totalEarned : 0, mult = state.settings.multiplier || 1;
-  return `<div class="stack">
-    ${connNotice()}
-    <div class="tc"><h2 class="hero-title disp neon">Class Leaderboard</h2>
-      <p class="muted small mt8">Scan codes, hit goals, climb the ranks. Lifetime stars decide your rank!</p>
-      <div class="mt16"><button class="btn slate sm" onclick="openProjector('board')"><span data-ic="cast"></span>Projector Mode</button></div></div>
-    ${mult > 1 ? `<div class="card gold-b tc disp b gold" style="font-size:21px">⚡ ${mult}× STAR POWER IS ON! Every scan = +${mult} stars ⚡</div>` : ''}
-    ${state.students.length === 0 ? `<div class="card tc" style="max-width:440px;margin:0 auto"><div style="font-size:48px">📋</div><h3 class="ctitle mt8">No students yet</h3><p class="muted small mt8">Ask your teacher to add students in the Teacher Hub.</p><button class="btn purple mt16" onclick="openTeacher()">Open Teacher Hub</button></div>` : `
-      ${podiumHTML(top3)}
-      <div class="cols-main">
-        <div class="card"><div class="flex jb ac"><h3 class="ctitle disp">Standings</h3><span class="tiny">${sorted.length} students</span></div>
-          <div class="scroll mt16" style="max-height:560px;display:grid;gap:8px">${sorted.map((s, i) => standingRow(s, i + 1, leader)).join('')}</div></div>
-        <div class="card"><h3 class="ctitle disp">⚡ Live Activity</h3>
-          <div class="scroll mt16" style="max-height:560px;display:grid;gap:8px">${state.activity.length === 0 ? '<p class="tiny">Nothing yet. Be the first to scan a code!</p>' : state.activity.map(a => `<div class="feed"><span style="font-size:18px">${a.icon}</span><div><div>${esc(a.msg)}</div><div class="tiny">${clock(a.t)}</div></div></div>`).join('')}</div></div>
-      </div>`}</div>`;
+  return `<div class="stack">${connNotice()}<div class="tc"><h2 class="hero-title disp neon">Class Leaderboard</h2><p class="muted small mt8">Scan codes, hit goals, climb the ranks. Lifetime stars decide your rank!</p><div class="mt16"><button class="btn slate sm" onclick="openProjector('board')"><span data-ic="cast"></span>Projector Mode</button></div></div>${mult > 1 ? `<div class="card gold-b tc disp b gold" style="font-size:21px">🔥 STAR POWER IS ON! Every scan = +${mult} stars</div>` : ''}${state.students.length === 0 ? `<div class="card tc" style="max-width:440px;margin:0 auto"><div style="font-size:48px">📋</div><h3 class="ctitle mt8">No students yet</h3><p class="muted small mt8">Ask your teacher to add students in the Teacher Hub.</p><button class="btn purple mt16" onclick="openTeacher()">Open Teacher Hub</button></div>` : `${podiumHTML(top3)}<div class="cols-main"><div class="card"><div class="flex jb ac"><h3 class="ctitle disp">Standings</h3><span class="tiny">${sorted.length} students</span></div><div class="scroll mt16" style="max-height:560px; display:grid; gap:8px">${sorted.map((s,i)=>standingRow(s,i+1,leader)).join('')}</div></div><div class="card"><h3 class="ctitle disp">Live Activity</h3><div class="scroll mt16" style="max-height:560px;display:grid;gap:8px">${state.activity.length === 0 ? '<p class="tiny">Nothing yet. Be the first to scan a code!</p>' : state.activity.map(a => `<div class="feed"><span style="font-size:18px">${a.icon}</span><div><div>${esc(a.msg)}</div><div class="tiny">${clock(a.t)}</div></div></div>`).join('')}</div></div></div>`}</div>`;
 }
-
 function openProjector(mode) {
   ui.projector = { mode:(mode === 'qr' && ui.teacher) ? 'qr' : 'board' };
   $('projector').classList.remove('hide'); renderProjector();
@@ -661,186 +597,91 @@ function setProjectorMode(m) { if (ui.projector) { ui.projector.mode = m; render
 function renderProjector() {
   const p = $('projector'); if (!ui.projector) return;
   const sorted = getSortedStudents(), leader = sorted.length ? sorted[0].totalEarned : 0, mode = ui.projector.mode, mult = state.settings.multiplier || 1;
-  const bar = `<div class="proj-bar"><div class="flex gap8">${ui.teacher ? `<button class="btn sm ${mode === 'board' ? 'purple' : 'slate'}" onclick="setProjectorMode('board')">Leaderboard</button><button class="btn sm ${mode === 'qr' ? 'purple' : 'slate'}" onclick="setProjectorMode('qr')">Scan Code</button>` : ''}</div>
-    <button class="btn sm red" onclick="closeProjector()"><span data-ic="x"></span>Exit (Esc)</button></div>`;
+  const bar = `<div class="proj-bar"><div class="flex gap8">${ui.teacher ? `<button class="btn sm ${mode === 'board' ? 'purple' : 'slate'}" onclick="setProjectorMode('board')">Leaderboard</button><button class="btn sm ${mode === 'qr' ? 'purple' : 'slate'}" onclick="setProjectorMode('qr')">Scan Code</button>` : ''}</div><button class="btn sm red" onclick="closeProjector()"><span data-ic="x"></span>Exit (Esc)</button></div>`;
   if (mode === 'qr') {
-    p.innerHTML = `<div class="proj">${bar}<h1 class="proj-title disp neon">Scan to earn ⭐${mult > 1 ? ' ×' + mult : ''}</h1>
-      <div class="proj-qr"><div class="qr-board"><div id="proj-qr"></div></div>
-        <div class="tc"><div class="tiny up" style="font-size:16px">No camera? Type this code</div><div class="bigcode">${esc(state.currentQrToken)}</div><div class="tiny mt8" style="font-size:14px">The code changes after every scan</div></div></div></div>`;
+    p.innerHTML = `<div class="proj">${bar}<h1 class="proj-title disp neon">Scan to earn ${mult>1?'x'+mult:''}⭐</h1><div class="proj-qr"><div class="qr-board"><div id="proj-qr"></div></div><div class="tc"><div class="tiny up" style="font-size:16px">No camera? Type this code</div><div class="bigcode">${esc(state.currentQrToken)}</div><div class="tiny mt8" style="font-size:14px">The code changes after every scan</div></div></div></div>`;
     drawQR($('proj-qr'), state.currentQrToken, Math.floor(Math.min(window.innerHeight * .5, window.innerWidth * .7, 420)));
   } else {
-    p.innerHTML = `<div class="proj">${bar}<h1 class="proj-title disp neon">🏆 Class Leaderboard</h1>
-      ${sorted.length ? podiumHTML(sorted.slice(0, 3)) : '<p class="tc muted mt24">No students yet.</p>'}
-      <div class="proj-grid">${sorted.slice(3, 13).map((s, i) => standingRow(s, i + 4, leader)).join('')}</div></div>`;
+    p.innerHTML = `<div class="proj">${bar}<h1 class="proj-title disp neon">Class Leaderboard</h1>${sorted.length ? podiumHTML(sorted.slice(0, 3)) : '<p class="tc muted mt24">No students yet.</p>'}<div class="proj-grid">${sorted.slice(3, 13).map((s, i) => standingRow(s, i + 4, leader)).join('')}</div></div>`;
   }
   postRender(true);
 }
 function drawQR(el, text, size) {
   if (!el) return; el.innerHTML = '';
-  if (typeof QRCode === 'undefined') { el.innerHTML = '<div style="color:#111;padding:30px;font-weight:800;text-align:center">QR picture could not load.<br>Use the code instead.</div>'; return; }
+  if (typeof QRCode === 'undefined') { el.innerHTML = '<div style="color:#111;padding:30px;font-weight:800;text-align:center">QR Code Engine Error.<br>Use the 6-character code instead.</div>'; return; }
   try { new QRCode(el, { text, width:size, height:size, colorDark:'#0b0720', colorLight:'#ffffff' }); } catch (e) { el.textContent = text; }
 }
-
 function renderStudentLoginView() {
   const sorted = [...state.students].sort((a, b) => a.name.localeCompare(b.name));
-  return `<div style="max-width:460px;margin:0 auto" class="stack">
-    ${connNotice()}
-    <div class="tc"><div style="font-size:50px">🎒</div><h2 class="hero-title disp neon" style="font-size:40px">Student Login</h2><p class="muted small mt8">Enter your name and the 6-character PIN from your teacher.</p></div>
-    <div class="card tilt" data-tilt="4"><form onsubmit="handleStudentPinLogin(event)" class="stack">
-      <div><label class="lbl">Your Name</label><input class="field" id="login-name-input" required autocomplete="off" placeholder="e.g. Alex S"></div>
-      <div><label class="lbl">6-Character PIN</label><input class="field mono up" id="login-pin-input" required maxlength="6" autocomplete="off" placeholder="A8X29K" style="letter-spacing:.2em"></div>
-      <button class="btn purple lg block" type="submit">Enter Student Portal 🚀</button></form></div>
-    ${sorted.length ? `<div><div class="tc tiny up b">Find your name</div><input class="field mt8" placeholder="Search names…" oninput="filterLogin(this.value)">
-      <div class="scroll mt12" id="login-list" style="max-height:230px;display:grid;gap:7px">${sorted.map(s => `<button onclick="fillStudentLogin('${esc(s.id)}')" data-name="${esc(s.name.toLowerCase())}" class="srow" style="cursor:pointer;color:#fff;text-align:left;width:100%"><span class="av" style="font-size:22px">${s.avatar}</span><span class="f1 sname">${esc(s.name)}</span><span class="tiny">Rank #${getStudentRank(s.id)}</span></button>`).join('')}</div></div>` : ''}</div>`;
+  return `<div style="max-width:460px; margin:0 auto" class="stack">${connNotice()}<div class="tc"><div style="font-size:50px">🎓</div><h2 class="hero-title disp neon" style="font-size:40px">Student Login</h2><p class="muted small mt8">Enter your name and the 6-character PIN from your teacher.</p></div><div class="card tilt" data-tilt="4"><form onsubmit="handleStudentPinLogin(event)" class="stack"><div><label class="lbl">Your Name</label><input class="field" id="login-name-input" required autocomplete="off" placeholder="e.g. Alex S"></div><div><label class="lbl">6-Character PIN</label><input class="field mono up" id="login-pin-input" required maxlength="6" autocomplete="off" placeholder="A8X29K" style="letter-spacing:.2em"></div><button class="btn purple lg block" type="submit">Enter Student Portal</button></form></div>${sorted.length ? `<div><div class="tc tiny up b">Find your name</div><input class="field mt8" placeholder="Search names..." oninput="filterLogin(this.value)"><div class="scroll mt12" id="login-list" style="max-height:230px; display:grid; gap:7px">${sorted.map(s => `<button onclick="fillStudentLogin('${esc(s.id)}')" data-name="${esc(s.name.toLowerCase())}" class="srow" style="cursor:pointer;color:#fff;text-align:left;width:100%"><span class="av">${s.avatar}</span><span class="f1 sname">${esc(s.name)}</span><span class="tiny">Rank #${getStudentRank(s.id)}</span></button>`).join('')}</div></div>` : ''}</div>`;
 }
 function filterLogin(v) { v = v.trim().toLowerCase(); document.querySelectorAll('#login-list [data-name]').forEach(b => { b.style.display = b.dataset.name.includes(v) ? '' : 'none'; }); }
 function fillStudentLogin(id) { const s = state.students.find(x => x.id === id); if (!s) return; $('login-name-input').value = s.name; $('login-pin-input').focus(); }
-
 function renderStudentDashboardView() {
   const s = activeStudent();
   if (!s) { setTimeout(() => switchView('student-login'), 0); return ''; }
   const rank = getStudentRank(s.id), sorted = getSortedStudents(), leader = sorted[0], gap = leader ? leader.totalEarned - s.totalEarned : 0, lv = levelInfo(s.totalEarned), top5 = sorted.slice(0, 5);
   const mine = state.redemptions.filter(r => r.studentId === s.id).slice(0, 5);
-  return `<div style="max-width:780px;margin:0 auto" class="stack">
-    <div class="flex jb ac fw gap8"><button class="btn slate sm" onclick="studentLogout()"><span data-ic="back"></span>Switch Account</button><span class="chip">Your PIN: <span class="mono gold">${esc(s.pin)}</span></span></div>
-    <div class="card tilt" data-tilt="5">
-      <div class="flex ac gap24 fw jc">
-        <button onclick="openAvatarPicker()" title="Change avatar" class="lift" style="width:100px;height:100px;border-radius:28px;font-size:52px;background:#1b1740;border:3px solid #a78bfa;box-shadow:0 0 30px rgba(167,139,250,.5);cursor:pointer">${s.avatar}</button>
-        <div class="f1" style="min-width:230px"><span class="chip">RANK #${rank} OF ${state.students.length}</span>
-          <h2 class="disp mt8" style="font-size:36px;font-weight:700">${esc(s.name)}</h2>
-          <p class="small" style="color:#c7c2f5">${rank === 1 ? '👑 You are leading the class!' : gap + ' lifetime stars behind 1st place'}</p>
-          <div class="mt12"><div class="flex jb tiny b" style="margin-bottom:5px"><span class="gold">${lv.cur.icon} ${lv.cur.name}</span><span>${lv.next ? lv.toNext + ' to ' + lv.next.icon + ' ' + lv.next.name : 'MAX LEVEL!'}</span></div><div class="xp"><i data-w="${lv.pct}"></i></div></div></div></div>
-      <div class="cols-2 mt16"><div class="box"><div class="tiny up b">Spendable</div><div class="bignum gold">⭐ <span data-count="${s.stars}">0</span></div></div>
-        <div class="box"><div class="tiny up b">Lifetime</div><div class="bignum pinkc">🏅 <span data-count="${s.totalEarned}">0</span></div></div></div></div>
-    <div class="cols-2">
-      <button class="tile tilt" data-tilt="12" onclick="switchView('student-scanner')" style="background:linear-gradient(135deg,#6c5ce7,#4338ca);box-shadow:0 6px 0 #2e2680,0 14px 26px rgba(0,0,0,.4)"><div class="lift" style="font-size:40px">📷</div><h3 class="disp mt8" style="font-size:21px">Scan Teacher Code</h3><p class="small" style="color:#c7d2fe">Scan the QR (or type the code) to earn stars!</p></button>
-      <button class="tile tilt" data-tilt="12" onclick="switchView('student-shop')" style="background:linear-gradient(135deg,#fd79a8,#e11d48);box-shadow:0 6px 0 #9f1239,0 14px 26px rgba(0,0,0,.4)"><div class="lift" style="font-size:40px">🎁</div><h3 class="disp mt8" style="font-size:21px">Prize Shop</h3><p class="small" style="color:#ffe4e6">Spend stars on passes and perks!</p></button></div>
-    <div class="card"><div class="flex jb ac"><h3 class="ctitle disp">🔥 Top 5</h3><button class="btn slate sm" onclick="switchView('leaderboard')">Full Leaderboard</button></div>
-      <div style="display:grid;gap:8px" class="mt16">${top5.map((x, i) => `<div class="srow" style="${x.id === s.id ? 'background:rgba(108,92,231,.28);border-color:#6c5ce7' : ''}"><div class="rank r${Math.min(i + 1, 4)}">#${i + 1}</div><div class="av" style="font-size:22px">${x.avatar}</div><div class="f1 sname">${esc(x.name)} ${x.id === s.id ? '(You)' : ''}</div><div class="starpill">⭐ ${x.totalEarned}</div></div>`).join('')}</div></div>
-    ${mine.length ? `<div class="card"><h3 class="ctitle disp">🎟️ My Prize Claims</h3><div style="display:grid;gap:8px" class="mt12">${mine.map(r => `<div class="feed flex jb"><span>${esc(r.icon)} ${esc(r.title)}</span><b style="color:${r.done ? '#34d399' : '#fbbf24'}">${r.done ? 'Given ✓' : 'Waiting for teacher'}</b></div>`).join('')}</div></div>` : ''}</div>`;
+  return `<div style="max-width:780px;margin:0 auto" class="stack"><div class="flex jb ac fw gap8"><button class="btn slate sm" onclick="studentLogout()"><span data-ic="back"></span>Switch Account</button><span class="chip">Your PIN: <span class="mono gold">${esc(s.pin)}</span></span></div><div class="card tilt" data-tilt="5"><div class="flex ac gap24 fw jc"><button onclick="openAvatarPicker()" title="Change avatar" class="lift" style="width:100px;height:100px;border-radius:28px;font-size:52px;background:#1b1740;border:3px solid #a78bfa;box-shadow:0 0 30px rgba(167,139,250,.5);cursor:pointer">${s.avatar}</button><div class="f1" style="min-width: 230px"><span class="chip">RANK #${rank} OF ${state.students.length}</span><h2 class="disp mt8" style="font-size:36px;font-weight:700">${esc(s.name)}</h2><p class="small" style="color:#c7c2f5">${rank===1?'🎉 You are leading the class!':gap+' lifetime stars behind 1st place'}</p><div class="mt12"><div class="flex jb tiny b" style="margin-bottom:5px"><span class="gold">${lv.cur.icon} ${lv.cur.name}</span><span>${lv.next ? lv.toNext + ' to ' + lv.next.icon + ' ' + lv.next.name : 'MAX LEVEL!'}</span></div><div class="xp"><i data-w="${lv.pct}"></i></div></div></div></div><div class="cols-2 mt16"><div class="box"><div class="tiny up b">Spendable</div><div class="bignum gold">⭐ <span data-count="${s.stars}">0</span></div></div><div class="box"><div class="tiny up b">Lifetime</div><div class="bignum pinkc">🏆 <span data-count="${s.totalEarned}">0</span></div></div></div></div><div class="cols-2"><button class="tile tilt" data-tilt="12" onclick="switchView('student-scanner')" style="background:linear-gradient(135deg,#6c5ce7,#4338ca);box-shadow:0 6px 0 #2e2680,0 14px 26px rgba(0,0,0,.4)"><div class="lift" style="font-size:40px">📷</div><h3 class="disp mt8" style="font-size:21px">Scan Teacher Code</h3><p class="small" style="color:#c7d2fe">Scan the QR (or type the code) to earn stars!</p></button><button class="tile tilt" data-tilt="12" onclick="switchView('student-shop')" style="background:linear-gradient(135deg,#fd79a8,#e11d48);box-shadow:0 6px 0 #9f1239,0 14px 26px rgba(0,0,0,.4)"><div class="lift" style="font-size:40px">🎁</div><h3 class="disp mt8" style="font-size:21px">Prize Shop</h3><p class="small" style="color:#ffe4e6">Spend stars on passes and perks!</p></button></div><div class="card"><div class="flex jb ac"><h3 class="ctitle disp">Top 5</h3><button class="btn slate sm" onclick="switchView('leaderboard')">Full Leaderboard</button></div><div style="display:grid;gap:8px" class="mt16">${top5.map((x, i) => `<div class="srow" style="${x.id===s.id?'background:rgba(108,92,231,.28);border-color:#6c5ce7':''}"><div class="rank r${Math.min(i + 1, 4)}">#${i+1}</div><div class="av" style="font-size:22px">${x.avatar}</div><div class="f1 sname">${esc(x.name)} ${x.id === s.id ? '(You)' : ''}</div><div class="starpill">⭐ ${x.totalEarned}</div></div>`).join('')}</div></div>${mine.length ? `<div class="card"><h3 class="ctitle disp">My Prize Claims</h3><div style="display:grid; gap:8px" class="mt12">${mine.map(r => `<div class="feed flex jb"><span>${esc(r.icon)} ${esc(r.title)}</span><b style="color:${r.done ? '#34d399' : '#fbbf24'}">${r.done ? 'Given' : 'Waiting for teacher'}</b></div>`).join('')}</div></div>` : ''}</div>`;
 }
 function studentLogout() { ui.activeStudentId = null; switchView('student-login'); }
 function openAvatarPicker() {
-  openModal(`${modalHead('Pick Your Avatar')}<div style="display:grid;grid-template-columns:repeat(8,1fr);gap:6px" class="mt16">${AVATARS.map(a => `<button onclick="setAvatar('${a}')" style="font-size:26px;padding:6px;border-radius:12px;background:rgba(255,255,255,.06);border:0;cursor:pointer">${a}</button>`).join('')}</div>`);
+  openModal(modalHead('Pick Your Avatar') + `<div style="display:grid; grid-template-columns:repeat(8, 1fr); gap:8px" class="mt16">${AVATARS.map(a => `<button onclick="setAvatar('${a}')" style="font-size:26px; padding:6px; border-radius:12px; background:rgba(255,255,255,.06); border:0; cursor:pointer">${a}</button>`).join('')}</div>`);
 }
 async function setAvatar(a) {
   const sid = ui.activeStudentId; await mutate(st => { const s = st.students.find(x => x.id === sid); if (s) s.avatar = a; return { ok:true }; });
   closeModal(); sfx('pop'); renderView('student-dashboard');
 }
 function renderStudentScannerView() {
-  return `<div style="max-width:480px;margin:0 auto" class="stack">
-    <button class="btn slate sm" onclick="switchView('student-dashboard')"><span data-ic="back"></span>Back</button>
-    <div class="tc"><h2 class="hero-title disp neon" style="font-size:38px">Scan for Stars 📷</h2><p class="muted small mt8">Point your camera at the teacher's QR code.</p></div>
-    <div class="card"><div id="reader" class="small muted" style="border-radius:14px;overflow:hidden"></div></div>
-    <div class="card"><label class="lbl">No camera? Type the 6-character code on the screen:</label>
-      <input class="field mono up" id="manual-token-input" maxlength="8" placeholder="K7Q2MX" style="letter-spacing:.25em;font-size:20px;text-align:center" onkeydown="if(event.key==='Enter')submitManualToken()">
-      <button class="btn green lg block mt12" onclick="submitManualToken()">Claim My Star ⭐</button></div></div>`;
+  return `<div style="max-width:480px;margin:0 auto" class="stack"><button class="btn slate sm" onclick="switchView('student-dashboard')"><span data-ic="back"></span>Back</button><div class="tc"><h2 class="hero-title disp neon" style="font-size:38px">Scan for Stars</h2><p class="muted small mt8">Point your camera at the teacher's QR code.</p></div><div class="card"><div id="reader" class="small muted" style="border-radius: 14px; overflow:hidden"></div></div><div class="card"><label class="lbl">No camera? Type the 6-character code on the screen:</label><input class="field mono up" id="manual-token-input" maxlength="8" placeholder="K7Q2MX" style="letter-spacing:.25em; font-size:20px;text-align:center" onkeydown="if(event.key==='Enter') submitManualToken()"><button class="btn green lg block mt12" onclick="submitManualToken()">Claim My Star</button></div></div>`;
 }
 function initQrScanner() {
   setTimeout(() => {
     const el = $('reader'); if (!el) return;
     if (typeof Html5QrcodeScanner === 'undefined') { el.innerHTML = '<div class="tc" style="padding:24px"><div style="font-size:34px">📷</div><p class="gold b small mt8">Camera scanner is unavailable here.</p><p class="tiny mt8">Type the code in the box below instead.</p></div>'; return; }
-    try { html5QrScanner = new Html5QrcodeScanner('reader', { fps:10, qrbox:{ width:220, height:220 } }, false); html5QrScanner.render(code => processTokenClaim(String(code).trim()), () => {}); }
-    catch (err) { el.innerHTML = '<div class="tc" style="padding:20px">Type the code in the box below to claim your star.</div>'; }
+    try {
+      html5QrScanner = new Html5QrcodeScanner('reader', { fps: 10, qrbox:{ width:220, height:220} }, false);
+      html5QrScanner.render(code => processTokenClaim(String(code).trim()), () => {});
+    } catch (err) { el.innerHTML = '<div class="tc" style="padding:20px">Type the code in the box below to claim your star.</div>'; }
   }, 300);
 }
 function submitManualToken() { const i = $('manual-token-input'); if (i && i.value.trim()) processTokenClaim(i.value.trim()); }
-
 function renderStudentShopView() {
   const s = activeStudent();
   if (!s) { setTimeout(() => switchView('student-login'), 0); return ''; }
-  return `<div style="max-width:1000px;margin:0 auto" class="stack">
-    <div class="flex jb ac"><button class="btn slate sm" onclick="switchView('student-dashboard')"><span data-ic="back"></span>Dashboard</button><span class="btn goldb sm" style="cursor:default">⭐ Balance: ${s.stars}</span></div>
-    <div class="tc"><h2 class="hero-title disp neon" style="font-size:42px">Prize Shop 🎁</h2><p class="muted small mt8">Spend your stars. Spending won't hurt your rank!</p></div>
-    <div class="cols-3">${state.prizes.map(p => {
-      const can = s.stars >= p.cost, stock = p.stock > 0;
-      return `<div class="card tilt" data-tilt="14" style="display:flex;flex-direction:column;justify-content:space-between"><div><div class="prize-ic">${esc(p.icon)}</div><h3 class="ctitle disp tc">${esc(p.title)}</h3><p class="tiny tc mt8">${esc(p.description)}</p></div>
-        <div class="flex jb ac mt16" style="border-top:1px solid var(--line);padding-top:14px"><div><div class="gold b">⭐ ${p.cost}</div><div class="tiny" style="color:${stock ? '' : '#fb7185'}">${stock ? 'Stock: ' + p.stock : 'Sold Out'}</div></div>
-        <button class="btn pink sm" onclick="claimPrize('${esc(p.id)}')" ${!can || !stock ? 'disabled' : ''}>${!stock ? 'Sold Out' : (!can ? 'Need ' + (p.cost - s.stars) + ' more' : 'Claim!')}</button></div></div>`;
-    }).join('')}</div></div>`;
+  return `<div style="max-width: 1000px;margin:0 auto" class="stack"><div class="flex jb ac"><button class="btn slate sm" onclick="switchView('student-dashboard')"><span data-ic="back"></span>Dashboard</button><span class="btn goldb sm" style="cursor:default">Balance: ⭐ ${s.stars}</span></div><div class="tc"><h2 class="hero-title disp neon" style="font-size:42px">Prize Shop</h2><p class="muted small mt8">Spend your stars. Spending won't hurt your rank!</p></div><div class="cols-3">${state.prizes.map(p => {
+    const can = s.stars >= p.cost, stock = p.stock > 0;
+    return `<div class="card tilt" data-tilt="14" style="display:flex; flex-direction:column; justify-content:space-between"><div><div class="prize-ic">${esc(p.icon)}</div><h3 class="ctitle disp tc">${esc(p.title)}</h3><p class="tiny tc mt8">${esc(p.description)}</p></div><div class="flex jb ac mt16" style="border-top: 1px solid var(--line); padding-top:14px"><div><div class="gold b">⭐ ${p.cost}</div><div class="tiny" style="color:${stock ? '' : '#fb7185'}">${stock?'Stock: '+p.stock:'Sold Out'}</div></div><button class="btn pink sm" onclick="claimPrize('${esc(p.id)}')" ${!can||!stock?'disabled':''}>${!stock ? 'Sold Out' : (!can ? 'Need ' + (p.cost - s.stars) + ' more' : 'Claim!')}</button></div></div>`;
+  }).join('')}</div></div>`;
 }
-
 function renderTeacherAuthView() {
-  return `<div style="max-width:420px;margin:20px auto"><div class="card tc"><div style="width:64px;height:64px;border-radius:18px;margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:30px;background:rgba(108,92,231,.22);border:1px solid rgba(108,92,231,.5)">🔒</div>
-    <h2 class="hero-title disp neon mt12" style="font-size:36px">Teacher Lock</h2><p class="muted small mt8">Enter the teacher password to open the controls.</p>
-    <form onsubmit="handleTeacherLogin(event)" class="mt16"><input class="field mono tc" type="password" id="teacher-password-input" placeholder="Password" required style="font-size:18px;letter-spacing:.2em">
-    <button class="btn purple lg block mt12" type="submit">Unlock</button></form></div></div>`;
+  return `<div style="max-width:420px;margin: 20px auto"><div class="card tc"><div style="width:64px;height:64px;border-radius:18px;margin:0 auto;display:flex;align-items:center; justify-content:center;font-size:30px;background:rgba(108,92,231,.22); border:1px solid rgba(108,92,231,.5)">🔒</div><h2 class="hero-title disp neon mt12" style="font-size:36px">Teacher Lock</h2><p class="muted small mt8">Enter the teacher password to open the controls.</p><form onsubmit="handleTeacherLogin(event)" class="mt16"><input class="field mono tc" type="password" id="teacher-password-input" placeholder="Password" required style="font-size:18px;letter-spacing:.2em"><button class="btn purple lg block mt12" type="submit">Unlock</button></form></div></div>`;
 }
-
-/* ----- teacher: roster, prizes, claims ----- */
+/* ===== TEACHER SUB-VIEWS ===== */
 function rosterHTML() {
   const list = getSortedStudents();
-  if (!list.length) return '<div class="tc tiny" style="padding:36px;border:1px dashed var(--line);border-radius:16px">No students yet. Press "Bulk Add" and paste your class list!</div>';
-  return list.map((st, idx) => `<div class="roster-row srow fw" data-name="${esc(st.name.toLowerCase())}"><div class="rank">#${idx + 1}</div><div class="av" style="font-size:22px">${st.avatar}</div>
-    <div class="f1" style="min-width:150px"><div class="sname">${esc(st.name)}</div><div class="tiny"><b class="gold">⭐ ${st.stars}</b> · lifetime ${st.totalEarned} · PIN <b class="mono" style="color:#a5b4fc">${esc(st.pin)}</b></div></div>
-    <div class="flex gap4"><button class="btn green sm" onclick="teacherAdjustStars('${esc(st.id)}',1)">+1</button><button class="btn blue sm" onclick="teacherAdjustStars('${esc(st.id)}',5)">+5</button><button class="btn red sm" onclick="teacherAdjustStars('${esc(st.id)}',-1)">-1</button>
-    <button class="btn slate sm" title="New PIN" onclick="resetPin('${esc(st.id)}')"><span data-ic="key" data-s="14"></span></button><button class="btn slate sm" title="Remove" onclick="deleteStudent('${esc(st.id)}')"><span data-ic="trash" data-s="14"></span></button></div></div>`).join('');
+  if (!list.length) return '<div class="tc tiny" style="padding:36px;border:1px dashed var(--line);border-radius: 16px">No students yet. Press "Bulk Add" and paste your class list!</div>';
+  return list.map((st, idx) => `<div class="roster-row srow fw" data-name="${esc(st.name.toLowerCase())}"><div class="rank">#${idx + 1}</div><div class="av" style="font-size:22px">${st.avatar}</div><div class="f1" style="min-width:150px"><div class="sname">${esc(st.name)}</div><div class="tiny"><b class="gold">⭐ ${st.stars}</b> (${st.totalEarned} lifetime) • PIN: <b class="mono" style="color:#a5b4fc">${esc(st.pin)}</b></div></div><div class="flex gap4"><button class="btn green sm" onclick="teacherAdjustStars('${esc(st.id)}', 1)">+1</button><button class="btn blue sm" onclick="teacherAdjustStars('${esc(st.id)}', 5)">+5</button><button class="btn red sm" onclick="teacherAdjustStars('${esc(st.id)}', -1)">-1</button><button class="btn slate sm" title="New PIN" onclick="resetPin('${esc(st.id)}')"><span data-ic="key" data-s="14"></span></button><button class="btn slate sm" onclick="deleteStudent('${esc(st.id)}')"><span data-ic="trash" data-s="14"></span></button></div></div>`).join('');
 }
 function prizesHTML() {
-  return state.prizes.map(p => `<div class="srow"><div class="av" style="font-size:24px">${esc(p.icon)}</div><div class="f1"><div class="sname trunc" style="font-size:13.5px">${esc(p.title)}</div><div class="tiny"><b class="gold">⭐ ${p.cost}</b> · Stock ${p.stock}</div></div>
-    <div class="flex gap4"><button class="btn slate sm" onclick="adjustStock('${esc(p.id)}',-1)">-</button><button class="btn slate sm" onclick="adjustStock('${esc(p.id)}',1)">+</button><button class="btn slate sm" onclick="deletePrize('${esc(p.id)}')"><span data-ic="trash" data-s="14"></span></button></div></div>`).join('') || '<p class="tiny">No prizes yet.</p>';
+  return state.prizes.map(p => `<div class="srow"><div class="av" style="font-size:24px">${esc(p.icon)}</div><div class="f1"><div class="sname trunc" style="font-size:13.5px">${esc(p.title)}</div><div class="tiny"><b class="gold">⭐ ${p.cost}</b> • Stock: ${p.stock}</div></div><div class="flex gap4"><button class="btn slate sm" onclick="adjustStock('${esc(p.id)}', -1)">-</button><button class="btn slate sm" onclick="adjustStock('${esc(p.id)}', 1)">+</button><button class="btn slate sm" onclick="deletePrize('${esc(p.id)}')"><span data-ic="trash" data-s="14"></span></button></div></div>`).join('') || '<p class="tiny">No prizes yet.</p>';
 }
 function claimsHTML() {
   const list = [...state.redemptions].sort((a, b) => (a.done - b.done) || (b.t - a.t)).slice(0, 40);
   if (!list.length) return '<p class="tiny">No claims yet.</p>';
-  return list.map(r => `<div class="srow" style="${r.done ? '' : 'border-color:rgba(251,191,36,.5)'}"><div class="f1"><div class="sname" style="font-size:13.5px">${esc(r.icon)} ${esc(r.title)}</div><div class="tiny">${esc(r.name)} · ${clock(r.t)}</div></div>
-    <button class="btn ${r.done ? 'slate' : 'green'} sm" onclick="toggleClaim('${esc(r.id)}')">${r.done ? 'Undo' : 'Mark Given'}</button></div>`).join('');
+  return list.map(r => `<div class="srow" style="${r.done?'':'border-color:rgba(251,191,36,.5)'}"><div class="f1"><div class="sname" style="font-size:13.5px">${esc(r.icon)} ${esc(r.title)}</div><div class="tiny">${esc(r.name)} • ${clock(r.t)}</div></div><button class="btn ${r.done?'slate':'green'} sm" onclick="toggleClaim('${esc(r.id)}')">${r.done ? 'Undo' : 'Mark Given'}</button></div>`).join('');
 }
 function rosterTabHTML() {
-  return `<div class="card"><div class="flex jb ac fw gap8"><h3 class="ctitle disp">Roster &amp; PINs</h3>
-    <div class="flex fw gap8"><input class="field" id="roster-search" style="width:160px;padding:8px 11px" placeholder="Search…" oninput="filterRoster(this.value)">
-      <button class="btn slate sm" onclick="promptSingleStudent()"><span data-ic="plus"></span>Add One</button><button class="btn purple sm" onclick="openBulkStudentModal()"><span data-ic="users"></span>Bulk Add</button><button class="btn blue sm" onclick="openPinList()"><span data-ic="list"></span>PIN List</button></div></div>
-    <div id="roster-list" class="scroll mt16" style="max-height:520px;display:grid;gap:8px">${rosterHTML()}</div></div>`;
+  return `<div class="card"><div class="flex jb ac fw gap8"><h3 class="ctitle disp">Roster &amp; PINs</h3><div class="flex fw gap8"><input class="field" id="roster-search" style="width: 160px;padding:8px 11px" placeholder="Search..." oninput="filterRoster(this.value)"><button class="btn slate sm" onclick="promptSingleStudent()"><span data-ic="plus"></span>Add One</button><button class="btn purple sm" onclick="openBulkStudentModal()"><span data-ic="users"></span>Bulk Add</button><button class="btn blue sm" onclick="openPinList()"><span data-ic="list"></span>PIN List</button></div></div><div id="roster-list" class="scroll mt16" style="max-height:520px; display:grid; gap:8px">${rosterHTML()}</div></div>`;
 }
 function prizesTabHTML() {
-  return `<div class="cols-2" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));align-items:start">
-    <div class="card"><div class="flex jb ac"><h3 class="ctitle disp">Prize Store</h3><button class="btn pink sm" onclick="openAddPrizeModal()"><span data-ic="plus"></span>Add Prize</button></div><div id="prize-list" class="scroll mt16" style="max-height:480px;display:grid;gap:8px">${prizesHTML()}</div></div>
-    <div class="card"><h3 class="ctitle disp">🎟️ Prize Claims</h3><div id="claims-list" class="scroll mt16" style="max-height:480px;display:grid;gap:8px">${claimsHTML()}</div></div></div>`;
+  return `<div class="cols-2" style="grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); align-items:start"><div class="card"><div class="flex jb ac"><h3 class="ctitle disp">Prize Store</h3><button class="btn pink sm" onclick="openAddPrizeModal()"><span data-ic="plus"></span>Add Prize</button></div><div id="prize-list" class="scroll mt16" style="max-height:480px; display:grid; gap:8px">${prizesHTML()}</div></div><div class="card"><h3 class="ctitle disp">Prize Claims</h3><div id="claims-list" class="scroll mt16" style="max-height:480px;display:grid;gap:8px">${claimsHTML()}</div></div></div>`;
 }
-
-/* ----- teacher: cloud & backup tab ----- */
 function saveCenterHTML() {
   const local = Store.caps.local || Store.caps.idb;
-  const pills = `<div class="flex fw gap8">
-    <span class="pill-status"><i class="dot ${Cloud.configured ? (Cloud.on ? '' : 'bad') : 'warn'}"></i>All devices: ${Cloud.configured ? (Cloud.on ? 'live' : (Cloud.error ? 'error' : 'connecting')) : 'not set up'}</span>
-    <span class="pill-status"><i class="dot ${local ? '' : 'warn'}"></i>This device: ${local ? 'saving' : 'reload-only'}</span></div>`;
-  let cloud;
-  if (Cloud.configured) {
-    const baked = 'const FIREBASE_CONFIG = ' + JSON.stringify(Cloud.cfg) + ';';
-    cloud = `${pills}
-      ${Cloud.error ? `<div class="notice bad mt12">Cloud error: <b>${esc(Cloud.error)}</b>.<br><span class="tiny">If it mentions permissions, open Firestore &rarr; Rules, paste the rules from the setup steps, and press Publish.</span></div>` : ''}
-      ${Cloud.on && !Cloud.exists ? `<div class="notice mt12 flex jb ac fw gap8"><span>Your class is not in the cloud yet.</span><button class="btn pink sm" onclick="publishToCloud()"><span data-ic="cloud"></span>Publish my class</button></div>` : ''}
-      <div class="mt16"><label class="lbl">A. Link for students (works right away on any device)</label>
-        <div class="flex gap8"><input class="field mono" id="student-link" readonly value="${esc(studentLink())}" style="font-size:11px"><button class="btn blue" onclick="copyText('student-link')"><span data-ic="copy"></span>Copy</button></div>
-        <p class="tiny mt8">Post this link in Google Classroom. A device that opens it once remembers the class.</p></div>
-      ${FIREBASE_CONFIG ? '<p class="tiny mt16">The plain website address already works for everyone (the config is built into this page).</p>' : `
-      <div class="mt16"><label class="lbl">B. Make the plain website address work for everyone (do once)</label>
-        <textarea class="field mono" id="baked-line" readonly rows="3" style="font-size:11px">${esc(baked)}</textarea>
-        <div class="flex gap8 mt8"><button class="btn blue sm" onclick="copyText('baked-line')"><span data-ic="copy"></span>Copy this line</button></div>
-        <p class="tiny mt8">On GitHub: open <b>index.html</b>, click the pencil icon, find <span class="mono">const FIREBASE_CONFIG = null;</span>, replace that whole line with the copied one, then <b>Commit changes</b>. After about a minute, anyone opening the site is on your class.</p></div>
-      <div class="mt16"><button class="btn slate sm" onclick="disconnectCloud()">Disconnect this device from the cloud</button></div>`}`;
-  } else {
-    cloud = `${pills}
-      <div class="notice mt12">Right now every device keeps its own separate data. Do this one-time setup (about 5 minutes, free) so every student device shares your class.</div>
-      <ol class="steps">
-        <li>Go to <b>console.firebase.google.com</b> and sign in with a Google account. Click <b>Create a project</b>, name it anything, and turn Google Analytics off.</li>
-        <li>In the left menu choose <b>Build &rarr; Firestore Database &rarr; Create database</b>. Pick any location, choose <b>Start in test mode</b>, and click Enable.</li>
-        <li>Open the <b>Rules</b> tab, replace everything with the text below, and press <b>Publish</b> (this keeps it working past 30 days).</li>
-      </ol>
-      <textarea class="field mono mt8" id="fb-rules" readonly rows="8" style="font-size:11px">${esc(RULES_TEXT)}</textarea>
-      <button class="btn blue sm mt8" onclick="copyText('fb-rules')"><span data-ic="copy"></span>Copy rules</button>
-      <ol class="steps" start="4">
-        <li>Click the <b>gear icon &rarr; Project settings</b>, scroll to <b>Your apps</b>, click the <b>&lt;/&gt;</b> (web) icon, and register an app with any name.</li>
-        <li>Copy the whole <b>firebaseConfig</b> block it shows, paste it here, and press Connect.</li>
-      </ol>
-      <textarea class="field mono mt8" id="fb-config-input" rows="7" style="font-size:12px" placeholder='const firebaseConfig = {&#10;  apiKey: "...",&#10;  authDomain: "...",&#10;  projectId: "...",&#10;  ...&#10;};'></textarea>
-      <button class="btn green lg block mt12" onclick="connectCloudWizard()"><span data-ic="cloud"></span>Connect</button>`;
-  }
-  const fileState = !FileSave.supported ? 'Not available in this browser' : FileSave.handle ? (FileSave.status === 'on' ? 'Linked, auto-saving' : 'Needs permission') : 'Not linked';
-  return `<div class="stack"><div class="card"><h3 class="ctitle disp">☁️ Share across all devices</h3><div class="mt12">${cloud}</div></div>
-    <div class="card"><h3 class="ctitle disp">💾 Backups</h3><p class="tiny mt8">Extra safety copies on your own computer. File saving: <b>${fileState}</b>.</p>
-      <div class="flex fw gap8 mt12">${FileSave.handle && FileSave.status !== 'on' ? `<button class="btn goldb sm" onclick="fileReconnect()"><span data-ic="folder"></span>Reconnect save file</button>` : `<button class="btn green sm" onclick="fileLink()"><span data-ic="folder"></span>${FileSave.handle ? 'Pick a different file' : 'Auto-save to a file'}</button>`}
-        <button class="btn blue sm" onclick="downloadBackup()"><span data-ic="download"></span>Download Backup</button><button class="btn slate sm" onclick="triggerImportFile()"><span data-ic="upload"></span>Restore from File</button></div></div></div>`;
+  const pills = `<div class="flex fw gap8"><span class="pill-status"><i class="dot ${Cloud.configured ? (Cloud.on ? '' : 'bad') : 'warn'}"></i>Database: ${Cloud.configured ? (Cloud.on ? 'Supabase Live' : (Cloud.error ? 'Error' : 'Connecting')) : 'Not configured'}</span><span class="pill-status"><i class="dot ${local ? '' : 'warn'}"></i>This Device Cache: ${local ? 'Active' : 'Disabled'}</span></div>`;
+  const fileState = !FileSave.supported ? 'Unavailable' : FileSave.handle ? (FileSave.status === 'on' ? 'Linked, Auto-Saving' : 'Needs Permission') : 'Not Linked';
+  return `<div class="stack"><div class="card"><h3 class="ctitle disp">Supabase Backend Status</h3><div class="mt12">${pills}${Cloud.error ? `<div class="notice bad mt12">Error: <b>${esc(Cloud.error)}</b></div>` : ''}<p class="tiny mt16">Your room database is live and streaming postgres_changes across all connected student devices.</p></div></div><div class="card"><h3 class="ctitle disp">File System &amp; Backups</h3><p class="tiny mt8">File status: <b>${fileState}</b>.</p><div class="flex fw gap8 mt12">${FileSave.handle && FileSave.status !== 'on' ? '<button class="btn goldb sm" onclick="fileReconnect()"><span data-ic="folder"></span>Reconnect File</button>' : `<button class="btn green sm" onclick="fileLink()"><span data-ic="folder"></span>${FileSave.handle ? 'Change File' : 'Auto-save to File'}</button>`}<button class="btn blue sm" onclick="downloadBackup()"><span data-ic="download"></span>Download JSON</button><button class="btn slate sm" onclick="triggerImportFile()"><span data-ic="upload"></span>Restore JSON</button></div></div></div>`;
 }
 function refreshSaveCenter() { const e = $('save-center'); if (e) { e.innerHTML = saveCenterHTML(); postRender(true); } }
 function refreshTeacherLists() {
@@ -854,37 +695,29 @@ function refreshTeacherLists() {
   postRender(true);
 }
 function filterRoster(v) { v = v.trim().toLowerCase(); document.querySelectorAll('#roster-list .roster-row').forEach(r => { r.style.display = r.dataset.name.includes(v) ? '' : 'none'; }); }
-
 function renderTeacherDashboardView() {
   const mult = state.settings.multiplier || 1, tab = ui.tab || 'roster', pend = state.redemptions.filter(x => !x.done).length;
   const cdot = Cloud.configured ? (Cloud.on ? '' : 'bad') : 'warn';
   const body = tab === 'prizes' ? prizesTabHTML() : tab === 'setup' ? `<div id="save-center">${saveCenterHTML()}</div>` : rosterTabHTML();
-  return `<div class="stack">
-    <div class="flex jb ac fw gap16"><div><span class="chip">TEACHER HUB</span><h2 class="hero-title disp neon mt8" style="font-size:36px">Command Center</h2>
-      <p class="tiny mt8">Students: <b style="color:#fff" id="roster-count">${state.students.length}</b> · Claims waiting: <b class="gold" id="claims-pending">${pend}</b></p></div>
-      <div class="flex fw gap8"><button class="btn goldb sm" onclick="openPicker()"><span data-ic="dice"></span>Random Picker</button><button class="btn slate sm" onclick="openProjector('board')"><span data-ic="cast"></span>Projector</button>
-        <button class="btn slate sm" onclick="openSettings()"><span data-ic="sliders"></span>Settings</button><button class="btn slate sm" onclick="lockTeacher()"><span data-ic="lock"></span>Lock</button></div></div>
-    ${Cloud.configured && !Cloud.on ? connNotice() : ''}
-    <div class="card gold-b"><div class="flex ac gap24 fw jc">
-      <div class="qrbox"><div id="teacher-active-qr-canvas"></div></div>
-      <div class="f1" style="min-width:250px"><span class="chip gold">⚡ STAR DISPENSER</span>
-        <div class="mono b gold mt8" style="font-size:34px;letter-spacing:.2em" id="teacher-token-label">${esc(state.currentQrToken)}</div>
-        <p class="tiny mt4">Each scan gives <b class="gold">+${mult} star${mult > 1 ? 's' : ''}</b>, then the code changes instantly.</p>
-        <div class="flex fw gap8 mt12 ac"><button class="btn goldb" onclick="openProjector('qr')"><span data-ic="cast"></span>Project Full Screen</button><button class="btn slate sm" onclick="manualRegenerateQr()"><span data-ic="rotate"></span>New Code</button></div>
-        <div class="flex fw gap8 mt12 ac"><span class="tiny b">Star Power:</span>${[1, 2, 3].map(n => `<button class="btn sm ${mult === n ? 'goldb' : 'slate'}" onclick="setMultiplier(${n})">${n}×</button>`).join('')}</div></div></div></div>
-    <div><div class="tabs"><button class="tab ${tab === 'roster' ? 'active' : ''}" onclick="setTab('roster')"><span data-ic="users"></span>Roster</button>
-      <button class="tab ${tab === 'prizes' ? 'active' : ''}" onclick="setTab('prizes')"><span data-ic="gift"></span>Prizes${pend ? ' <span class="chip gold">' + pend + '</span>' : ''}</button>
-      <button class="tab ${tab === 'setup' ? 'active' : ''}" onclick="setTab('setup')"><i class="dot ${cdot}"></i>Cloud &amp; Backup</button></div>
-      <div class="mt16">${body}</div></div></div>`;
+  return `<div class="stack"><div class="flex jb ac fw gap16"><div><span class="chip">TEACHER HUB</span><h2 class="hero-title disp neon mt8" style="font-size:36px">Command Center</h2><p class="tiny mt8">Students: <b style="color:#fff" id="roster-count">${state.students.length}</b> • Claims Waiting: <b class="gold" id="claims-pending">${pend}</b></p></div><div class="flex fw gap8"><button class="btn goldb sm" onclick="openPicker()"><span data-ic="dice"></span>Random Picker</button><button class="btn slate sm" onclick="openProjector('board')"><span data-ic="cast"></span>Projector</button><button class="btn slate sm" onclick="openSettings()"><span data-ic="sliders"></span>Settings</button><button class="btn slate sm" onclick="lockTeacher()"><span data-ic="lock"></span>Lock</button></div></div>${Cloud.configured&&!Cloud.on?connNotice():''}<div class="card gold-b"><div class="flex ac gap24 fw jc"><div class="qrbox"><div id="teacher-active-qr-canvas"></div></div><div class="f1" style="min-width:250px"><span class="chip gold">STAR DISPENSER</span><div class="mono b gold mt8" style="font-size:34px;letter-spacing:.2em" id="teacher-token-label">${esc(state.currentQrToken)}</div><p class="tiny mt4">Each scan gives <b class="gold">+${mult} star${mult > 1 ? 's' : ''}</b>, then changes.</p><div class="flex fw gap8 mt12 ac"><button class="btn goldb" onclick="openProjector('qr')"><span data-ic="cast"></span>Project Full Screen</button><button class="btn slate sm" onclick="manualRegenerateQr()"><span data-ic="rotate"></span>New Code</button></div><div class="flex fw gap8 mt12 ac"><span class="tiny b">Star Power:</span>${[1, 2, 3].map(n => `<button class="btn sm ${mult===n?'goldb':'slate'}" onclick="setMultiplier(${n})">${n}x</button>`).join('')}</div></div></div></div><div><div class="tabs"><button class="tab ${tab === 'roster' ? 'active' : ''}" onclick="setTab('roster')"><span data-ic="users"></span>Roster</button><button class="tab ${tab === 'prizes' ? 'active' : ''}" onclick="setTab('prizes')"><span data-ic="gift"></span>Prize Store ${pend ? '<span class="chip gold">' + pend + '</span>' : ''}</button><button class="tab ${tab === 'setup' ? 'active' : ''}" onclick="setTab('setup')"><i class="dot ${cdot}"></i>Database Engine</button></div><div class="mt16">${body}</div></div></div>`;
 }
-
 function renderTeacherQrCanvas() { drawQR($('teacher-active-qr-canvas'), state.currentQrToken, 170); }
-async function manualRegenerateQr() { await mutate(st => { st.currentQrToken = newCode(); return { ok:true }; }); renderTeacherQrCanvas(); const l = $('teacher-token-label'); if (l) l.textContent = state.currentQrToken; showToast('New star code!', 'info'); }
-async function setMultiplier(n) { await mutate(st => { st.settings.multiplier = n; return { ok:true }; }); sfx('pop'); showToast(n > 1 ? '⚡ ' + n + '× Star Power on!' : 'Back to normal stars', 'success'); renderView('teacher-dashboard'); }
-
-/* ===== password (hashed, so it is not readable in the shared class data) ===== */
+async function manualRegenerateQr() {
+  await mutate(st => { st.currentQrToken = newCode(); return { ok:true }; });
+  renderTeacherQrCanvas(); const l = $('teacher-token-label'); if (l) l.textContent = state.currentQrToken; showToast('New code generated!', 'info');
+}
+async function setMultiplier(n) {
+  await mutate(st => { st.settings.multiplier = n; return { ok:true }; });
+  sfx('pop'); showToast(n > 1 ? `${n}x Star Power active!` : 'Standard points restored', 'success'); renderView('teacher-dashboard');
+}
+/* ===== PASSWORD SYSTEM ===== */
 async function hashPw(p) {
-  try { if (window.crypto && crypto.subtle) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('starchamps:' + p)); return 'h1:' + Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2, '0')).join(''); } } catch (e) {}
+  try {
+    if (window.crypto && crypto.subtle) {
+      const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('starchamps:' + p));
+      return 'h1:' + Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2, '0')).join('');
+    }
+  } catch (e) {}
   return 'b64:' + btoa(unescape(encodeURIComponent(p)));
 }
 async function checkPassword(p) {
@@ -893,15 +726,13 @@ async function checkPassword(p) {
   if (s.passB64) { try { return p === atob(s.passB64); } catch (e) { return false; } }
   return p === 'qwerty';
 }
-
-/* ===== actions ===== */
+/* ===== ACTIONS & HANDLERS ===== */
 async function handleTeacherLogin(e) {
   e.preventDefault();
   const pwd = $('teacher-password-input').value;
   if (await checkPassword(pwd)) {
     ui.teacher = true; sfx('pop'); showToast('Teacher Hub unlocked', 'success');
     if (Cloud.on && !Cloud.exists && !Cloud.pub) { Cloud.pub = true; await publishToCloud(); }
-    if (!state.settings.passHash && !state.settings.passB64) setTimeout(() => showToast('Tip: change the default password in Settings', 'info'), 900);
     switchView('teacher-dashboard');
   } else { sfx('error'); showToast('Incorrect password!', 'error'); }
 }
@@ -910,7 +741,7 @@ function handleStudentPinLogin(e) {
   const name = $('login-name-input').value.trim().toLowerCase(), pin = $('login-pin-input').value.trim().toUpperCase();
   const s = state.students.find(x => x.name.toLowerCase() === name && x.pin.toUpperCase() === pin);
   if (s) { ui.activeStudentId = s.id; sfx('pop'); showToast('Welcome back, ' + s.name + '!', 'success'); switchView('student-dashboard'); }
-  else { sfx('error'); showToast(Cloud.configured && !Cloud.on ? 'Still connecting to the class. Try again in a moment.' : 'Name or PIN is not right. Try again!', 'error'); }
+  else { sfx('error'); showToast(Cloud.configured && !Cloud.on ? 'Connecting to database...' : 'Name or PIN is incorrect.', 'error'); }
 }
 async function processTokenClaim(raw) {
   if (claiming) return; const sid = ui.activeStudentId;
@@ -922,13 +753,14 @@ async function processTokenClaim(raw) {
     const amt = st.settings.multiplier || 1, before = levelInfo(me.totalEarned).i;
     me.stars += amt; me.totalEarned += amt; st.currentQrToken = newCode();
     addLog(st, '⭐', me.name + ' scanned a code (+' + amt + ')');
-    const after = levelInfo(me.totalEarned); if (after.i > before) addLog(st, '🚀', me.name + ' reached ' + after.cur.name + '!');
+    const after = levelInfo(me.totalEarned); if (after.i > before) addLog(st, '🎉', me.name + ' reached ' + after.cur.name + '!');
     return { ok:true, amt, leveled:after.i > before, lv:after.cur, stars:me.stars };
   });
   if (res.error) { claiming = false; if (res.error !== 'offline') { sfx('error'); showToast(explainError(res), 'error'); } return; }
   setTimeout(() => { claiming = false; }, 1200);
   killScanner(); sfx('star'); celebrate(); starPop('+' + res.amt + ' ⭐'); bg.boost = 1;
-  showToast('Point claimed! You have ' + res.stars + ' stars', 'success'); switchView('student-dashboard');
+  showToast('Point claimed! Balance: ' + res.stars + ' stars', 'success');
+  switchView('student-dashboard');
   if (res.leveled) setTimeout(() => levelUp(res.lv), 900);
 }
 async function claimPrize(id) {
@@ -942,7 +774,7 @@ async function claimPrize(id) {
     addLog(st, '🎁', s.name + ' claimed ' + p.title); return { ok:true, title:p.title };
   });
   if (res.error) { if (res.error !== 'offline') { sfx('error'); showToast(res.error === 'poor' ? 'Not enough stars!' : res.error === 'out' ? 'Out of stock!' : explainError(res), 'error'); } renderView('student-shop'); return; }
-  sfx('star'); celebrate(); bg.boost = .8; showToast('Claimed "' + res.title + '"! Show your teacher.', 'success'); renderView('student-shop');
+  sfx('star'); celebrate(); bg.boost = .8; showToast('Claimed ' + res.title + '! Show your teacher.', 'success'); renderView('student-shop');
 }
 async function toggleClaim(id) { await mutate(st => { const r = st.redemptions.find(x => x.id === id); if (r) r.done = !r.done; return { ok:true }; }); refreshTeacherLists(); }
 async function teacherAdjustStars(id, amt) {
@@ -950,7 +782,7 @@ async function teacherAdjustStars(id, amt) {
     const s = st.students.find(x => x.id === id); if (!s) return { error:'no-student' };
     const before = levelInfo(s.totalEarned).i;
     if (amt > 0) { s.stars += amt; s.totalEarned += amt; } else { s.stars = Math.max(0, s.stars + amt); s.totalEarned = Math.max(0, s.totalEarned + amt); }
-    if (amt > 0) { addLog(st, '⭐', s.name + ' earned +' + amt + ' from the teacher'); const a = levelInfo(s.totalEarned); if (a.i > before) addLog(st, '🚀', s.name + ' reached ' + a.cur.name + '!'); }
+    if (amt > 0) { addLog(st, '⭐', s.name + ' earned +' + amt + ' from teacher'); const a = levelInfo(s.totalEarned); if (a.i > before) addLog(st, '🎉', s.name + ' reached ' + a.cur.name + '!'); }
     return { ok:true };
   });
   if (amt > 0) bg.boost = .6; sfx(amt > 0 ? 'star' : 'pop'); refreshTeacherLists();
@@ -966,22 +798,19 @@ function deleteStudent(id) {
 async function adjustStock(id, d) { await mutate(st => { const p = st.prizes.find(x => x.id === id); if (p) p.stock = Math.max(0, p.stock + d); return { ok:true }; }); refreshTeacherLists(); }
 function deletePrize(id) {
   const p = state.prizes.find(x => x.id === id); if (!p) return;
-  askConfirm('Delete the prize "' + p.title + '"?', async () => { await mutate(st => { st.prizes = st.prizes.filter(x => x.id !== id); return { ok:true }; }); refreshTeacherLists(); showToast('Prize deleted', 'info'); });
+  askConfirm('Delete prize "' + p.title + '"?', async () => { await mutate(st => { st.prizes = st.prizes.filter(x => x.id !== id); return { ok:true }; }); refreshTeacherLists(); showToast('Prize deleted', 'info'); });
 }
-
-/* ===== modals ===== */
+/* ===== MODALS & UI OVERLAYS ===== */
 function openModal(html) { $('modal-content').innerHTML = html; $('modal').classList.add('open'); postRender(true); }
 function closeModal() { $('modal').classList.remove('open'); $('modal-content').innerHTML = ''; }
-function modalHead(t) { return `<div class="flex jb ac" style="border-bottom:1px solid var(--line);padding-bottom:12px"><h3 class="ctitle disp">${t}</h3><button onclick="closeModal()" style="background:none;border:0;color:#a9a4d3;cursor:pointer">${ic('x', 20)}</button></div>`; }
+function modalHead(t) { return `<div class="flex jb ac" style="border-bottom:1px solid var(--line);padding-bottom: 12px"><h3 class="ctitle disp">${t}</h3><button onclick="closeModal()" style="background:none;border:0;color:#a9a4d3;cursor:pointer">${ic('x', 20)}</button></div>`; }
 function askConfirm(msg, yes) {
   pendingConfirm = yes;
-  openModal(`<div class="tc"><div style="font-size:44px">🤔</div><p class="mt12">${esc(msg)}</p><div class="flex jc gap8 mt16"><button class="btn slate" onclick="closeModal()">Cancel</button><button class="btn red" onclick="runConfirm()">Yes, do it</button></div></div>`);
+  openModal(`<div class="tc"><div style="font-size:44px">⚠️</div><p class="mt12">${esc(msg)}</p><div class="flex jc gap8 mt16"><button class="btn slate" onclick="closeModal()">Cancel</button><button class="btn red" onclick="runConfirm()">Yes, Proceed</button></div></div>`);
 }
 function runConfirm() { const f = pendingConfirm; pendingConfirm = null; closeModal(); if (f) f(); }
-
 function openBulkStudentModal() {
-  openModal(`${modalHead('Bulk Add Class Roster 👥')}<p class="tiny mt12">Paste names (one per line or separated by commas). Each student gets a unique 6-character PIN. Tip: first name + last initial keeps student info private.</p>
-    <textarea class="field mono mt12" id="bulk-students-input" rows="8" placeholder="Alex S&#10;Jordan L&#10;Taylor R"></textarea><button class="btn purple lg block mt12" onclick="processBulkStudents()">Import Roster</button>`);
+  openModal(`${modalHead('Bulk Add Roster')}<p class="tiny mt12">Paste student names below (one per line or separated by commas):</p><textarea class="field mono mt12" id="bulk-students-input" rows="8" placeholder="Alex S&#10;Jordan L&#10;Taylor R"></textarea><button class="btn purple lg block mt12" onclick="processBulkStudents()">Import Roster</button>`);
 }
 async function processBulkStudents() {
   const t = $('bulk-students-input'); if (!t) return;
@@ -989,49 +818,42 @@ async function processBulkStudents() {
   if (!names.length) { showToast('Enter at least one name', 'error'); return; }
   const res = await mutate(st => {
     names.forEach(name => st.students.push({ id:'stu-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), name, pin:pinFor(st), stars:0, totalEarned:0, avatar:AVATARS[Math.floor(Math.random() * AVATARS.length)] }));
-    addLog(st, '📋', names.length + ' new students joined the league!'); return { ok:true };
+    addLog(st, '👥', names.length + ' new students joined!'); return { ok:true };
   });
   if (res.error) { showToast(explainError(res), 'error'); return; }
-  closeModal(); renderView('teacher-dashboard'); showToast('Added ' + names.length + ' students with PINs', 'success');
+  closeModal(); renderView('teacher-dashboard'); showToast('Added ' + names.length + ' students', 'success');
 }
 function promptSingleStudent() {
-  openModal(`${modalHead('Add One Student 👤')}<form onsubmit="saveSingleStudent(event)" class="mt16"><input class="field" id="single-student-name-input" required placeholder="Name"><button class="btn purple lg block mt12" type="submit">Save Student</button></form>`);
+  openModal(`${modalHead('Add Student')}<form onsubmit="saveSingleStudent(event)" class="mt16"><input class="field" id="single-student-name-input" required placeholder="Student Name"><button class="btn purple lg block mt12" type="submit">Save Student</button></form>`);
   setTimeout(() => { const e = $('single-student-name-input'); if (e) e.focus(); }, 50);
 }
 async function saveSingleStudent(e) {
-  e.preventDefault(); const i = $('single-student-name-input'); if (!i || !i.value.trim()) return; const name = i.value.trim().slice(0, 40);
+  e.preventDefault(); const i = $('single-student-name-input'); if (!i || !i.value.trim()) return;
+  const name = i.value.trim().slice(0, 40);
   const res = await mutate(st => { st.students.push({ id:'stu-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), name, pin:pinFor(st), stars:0, totalEarned:0, avatar:AVATARS[Math.floor(Math.random() * AVATARS.length)] }); return { ok:true }; });
   if (res.error) { showToast(explainError(res), 'error'); return; }
   closeModal(); refreshTeacherLists(); showToast('Added ' + name + '!', 'success');
 }
 function openAddPrizeModal() {
-  openModal(`${modalHead('Add New Prize 🎁')}<form onsubmit="saveNewPrize(event)" class="stack mt16">
-    <div><label class="lbl">Prize title</label><input class="field" id="prize-title-input" required></div>
-    <div class="cols-2"><div><label class="lbl">Star cost</label><input class="field" type="number" id="prize-cost-input" min="1" value="10"></div><div><label class="lbl">Stock</label><input class="field" type="number" id="prize-stock-input" min="1" value="10"></div></div>
-    <div><label class="lbl">Emoji icon</label><input class="field" id="prize-icon-input" value="🎁"></div><div><label class="lbl">Description</label><textarea class="field" id="prize-desc-input" rows="2"></textarea></div>
-    <button class="btn pink lg block" type="submit">Save Prize</button></form>`);
+  openModal(`${modalHead('Add Prize')}<form onsubmit="saveNewPrize(event)" class="stack mt16"><div><label class="lbl">Prize Title</label><input class="field" id="prize-title-input" required></div><div class="cols-2"><div><label class="lbl">Star Cost</label><input class="field" type="number" id="prize-cost-input" min="1" value="10"></div><div><label class="lbl">Initial Stock</label><input class="field" type="number" id="prize-stock-input" min="1" value="10"></div></div><div><label class="lbl">Emoji Icon</label><input class="field" id="prize-icon-input" value="🎟️"></div><div><label class="lbl">Description</label><textarea class="field" id="prize-desc-input" rows="2"></textarea></div><button class="btn pink lg block" type="submit">Save Prize</button></form>`);
 }
 async function saveNewPrize(e) {
   e.preventDefault();
-  const prize = { id:'prz-' + Date.now(), title:$('prize-title-input').value.trim(), cost:Math.max(1, parseInt($('prize-cost-input').value) || 10), stock:Math.max(1, parseInt($('prize-stock-input').value) || 10), icon:$('prize-icon-input').value.trim() || '🎁', description:$('prize-desc-input').value.trim() };
+  const prize = { id:'prz-' + Date.now(), title:$('prize-title-input').value.trim(), cost:Math.max(1,parseInt($('prize-cost-input').value) || 10), stock: Math.max(1, parseInt($('prize-stock-input').value)||10), icon:$('prize-icon-input').value.trim() || '🎟️', description:$('prize-desc-input').value.trim() };
   const res = await mutate(st => { st.prizes.push(prize); return { ok:true }; });
   if (res.error) { showToast(explainError(res), 'error'); return; }
-  closeModal(); refreshTeacherLists(); showToast('Prize added', 'success');
+  closeModal(); refreshTeacherLists(); showToast('Prize created', 'success');
 }
-
-/* fast random picker: ~1 second */
 function openPicker() {
   if (!state.students.length) { showToast('Add students first', 'error'); return; }
-  openModal(`${modalHead('Random Picker 🎲')}<div class="tc mt16"><div id="picker-avatar" style="font-size:78px">🎲</div><div id="picker-name" class="disp neon" style="font-size:34px;font-weight:700;min-height:44px">Ready?</div>
-    <label class="tiny flex jc ac gap8 mt12" style="cursor:pointer"><input type="checkbox" id="picker-norepeat" checked> Skip students already picked</label>
-    <button class="btn goldb lg block mt12" id="picker-btn" onclick="spinPicker()">SPIN!</button></div>`);
+  openModal(`${modalHead('Random Picker')}<div class="tc mt16"><div id="picker-avatar" style="font-size:78px">🎯</div><div id="picker-name" class="disp neon" style="font-size:34px;font-weight:700;min-height:44px">Ready?</div><label class="tiny flex jc ac gap8 mt12" style="cursor:pointer"><input type="checkbox" id="picker-norepeat" checked> Skip students already picked</label><button class="btn goldb lg block mt12" id="picker-btn" onclick="spinPicker()">SPIN!</button></div>`);
 }
 function spinPicker() {
   const btn = $('picker-btn'); if (!btn || btn.disabled) return; btn.disabled = true;
   const nr = $('picker-norepeat') && $('picker-norepeat').checked;
   if (!ui.picked) ui.picked = new Set();
   let pool = state.students.filter(s => !nr || !ui.picked.has(s.id));
-  if (!pool.length) { ui.picked.clear(); pool = state.students.slice(); showToast('Everyone has been picked. Starting over!', 'info'); }
+  if (!pool.length) { ui.picked.clear(); pool = state.students.slice(); showToast('Resetting spin pool!', 'info'); }
   const winner = pool[Math.floor(Math.random() * pool.length)]; ui.picked.add(winner.id);
   const ticks = 12; let i = 0, delay = 45;
   (function tick() {
@@ -1042,19 +864,17 @@ function spinPicker() {
     else { celebrate(); sfx('star'); bg.boost = 1; btn.disabled = false; btn.textContent = 'SPIN AGAIN'; }
   })();
 }
-
 function openPinList() {
   const text = [...state.students].sort((a, b) => a.name.localeCompare(b.name)).map(s => s.name + ' - ' + s.pin).join('\n');
-  openModal(`${modalHead('PIN List 🔑')}<p class="tiny mt12">Copy this into a doc to hand out PINs. Keep it private!</p><textarea class="field mono mt12" id="pin-text" readonly rows="10">${esc(text)}</textarea><button class="btn blue lg block mt12" onclick="copyText('pin-text')">Copy to Clipboard</button>`);
+  openModal(modalHead('Roster PIN List') + `<p class="tiny mt12">Export student access PINs:</p><textarea class="field mono mt12" id="pin-text" rows="10" readonly>${esc(text)}</textarea><button class="btn blue lg block mt12" onclick="copyText('pin-text')">Copy to Clipboard</button>`);
 }
 function copyText(id) {
   const t = $(id); t.select();
-  try { if (navigator.clipboard) navigator.clipboard.writeText(t.value).catch(() => document.execCommand('copy')); else document.execCommand('copy'); showToast('Copied!', 'success'); } catch (e) { showToast('Press Ctrl+C to copy the selected text', 'info'); }
+  try { if (navigator.clipboard) navigator.clipboard.writeText(t.value).catch(() => document.execCommand('copy')); else document.execCommand('copy'); showToast('Copied to clipboard!', 'success'); }
+  catch (e) { showToast('Manual copy required (Ctrl+C)', 'info'); }
 }
 function openSettings() {
-  openModal(`${modalHead('Settings')}<div class="mt16"><label class="lbl">Change teacher password</label><div class="flex gap8"><input class="field" type="password" id="new-pass-input" placeholder="New password (4+ characters)"><button class="btn purple" onclick="saveNewPassword()">Save</button></div>
-    <p class="tiny mt8">Classroom-level lock. The password is stored scrambled (hashed), but pick something students would not guess.</p></div>
-    <div class="mt24"><label class="lbl">New season</label><button class="btn red block" onclick="newSeason()">Reset all stars to 0 (keeps students &amp; PINs)</button></div>`);
+  openModal(`${modalHead('Settings')}<div class="mt16"><label class="lbl">Change Teacher Password</label><div class="flex gap8"><input class="field" type="password" id="new-pass-input" placeholder="New password (4+ chars)"><button class="btn purple" onclick="saveNewPassword()">Save</button></div></div><div class="mt24"><label class="lbl">New Season Reset</label><button class="btn red block" onclick="newSeason()">Reset Stars to 0 (Retains Roster)</button></div>`);
 }
 async function saveNewPassword() {
   const v = $('new-pass-input').value; if (v.length < 4) { showToast('Use at least 4 characters', 'error'); return; }
@@ -1063,35 +883,31 @@ async function saveNewPassword() {
   closeModal(); showToast('Password updated', 'success');
 }
 function newSeason() {
-  askConfirm('Reset every student to 0 stars and clear the activity feed?', async () => {
-    await mutate(st => { st.students.forEach(s => { s.stars = 0; s.totalEarned = 0; }); st.activity = []; st.redemptions = []; addLog(st, '🏁', 'A brand new season has started!'); return { ok:true }; });
-    renderView('teacher-dashboard'); showToast('New season started!', 'success');
+  askConfirm('Reset all students to 0 stars and clear activity feed?', async () => {
+    await mutate(st => { st.students.forEach(s => { s.stars = 0; s.totalEarned = 0; }); st.activity = []; st.redemptions = []; addLog(st, '🏁', 'A new season has started!'); return { ok:true }; });
+    renderView('teacher-dashboard'); showToast('New season initialized!', 'success');
   });
 }
 function openSaveModal() {
-  const c = Store.caps, row = (ok, label) => `<div class="feed flex jb"><span>${label}</span><b style="color:${ok ? '#34d399' : '#94a3b8'}">${ok ? 'Working' : 'Blocked'}</b></div>`;
-  const cloudTxt = Cloud.configured ? (Cloud.on ? 'Live. Every device shares one class.' : (Cloud.error ? 'Cannot connect: ' + esc(Cloud.error) : 'Connecting…')) : 'Not set up. This device keeps its own data.';
-  openModal(`${modalHead('Save Status 💾')}
-    <div class="feed mt12"><span>☁️</span><div><b>All devices:</b> ${cloudTxt}</div></div>
-    <div style="display:grid;gap:7px" class="mt12">${row(c.local, 'This device: browser storage')}${row(c.idb, 'This device: browser database')}</div>
-    ${ui.teacher ? `<button class="btn purple block mt16" onclick="closeModal();setTab('setup')">Open Cloud &amp; Backup</button>` : '<p class="tiny mt16">Teachers: open the Teacher tab, then Cloud &amp; Backup, to share the class across devices.</p>'}`);
+  const c = Store.caps, row = (ok, label) => `<div class="feed flex jb"><span>${label}</span><b style="color:${ok ? '#34d399' : '#94a3b8'}">${ok ? 'Active' : 'Disabled'}</b></div>`;
+  const cloudTxt = Cloud.configured ? (Cloud.on ? 'Supabase Database Connected Realtime' : (Cloud.error ? 'Connection Failure: ' + esc(Cloud.error) : 'Connecting...')) : 'Offline Mode';
+  openModal(modalHead('Database & Storage Diagnostics') + `<div class="feed mt12"><span>☁️</span><div><b>Backend:</b> ${cloudTxt}</div></div><div style="display:grid;gap:7px" class="mt12">${row(c.local, 'Browser LocalStorage')}${row(c.idb,'Browser IndexedDB')}</div>${ui.teacher ? '<button class="btn purple block mt16" onclick="closeModal(); setTab(\'setup\')">Open Database Engine</button>' : ''}`);
 }
 function downloadBackup() {
-  try { const blob = new Blob([JSON.stringify(getPayload(), null, 2)], { type:'application/json' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'StarChampions_Backup_' + new Date().toISOString().slice(0, 10) + '.json'; document.body.appendChild(a); a.click(); a.remove(); showToast('Backup downloaded', 'success'); }
-  catch (e) { showToast('Downloads are blocked here.', 'info'); }
+  try { const blob = new Blob([JSON.stringify(getPayload(), null, 2)], { type:'application/json' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'StarChampions_Backup_' + new Date().toISOString().slice(0, 10) + '.json'; document.body.appendChild(a); a.click(); a.remove(); showToast('Backup file generated', 'success'); }
+  catch (e) { showToast('File export failed.', 'info'); }
 }
 function triggerImportFile() { $('json-import-input').click(); }
 function handleImportFile(ev) { const f = ev.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = e => restoreFromText(e.target.result); r.readAsText(f); ev.target.value = ''; }
 async function restoreFromText(txt) {
-  const o = Store.parse(String(txt || '').trim()); if (!o) { showToast('That does not look like a valid backup', 'error'); return; }
+  const o = Store.parse(String(txt || '').trim()); if (!o) { showToast('Invalid JSON file format', 'error'); return; }
   if (Cloud.configured) {
     const res = await mutate(st => { st.students = o.students; st.prizes = o.prizes || st.prizes; st.activity = o.activity || []; st.redemptions = o.redemptions || []; st.settings = Object.assign(st.settings, o.settings || {}); return { ok:true }; });
     if (res.error) { showToast(explainError(res), 'error'); return; }
   } else { applyData(o); saveState(); }
   closeModal(); if (ui.view === 'teacher-dashboard') renderView('teacher-dashboard'); else softRerender(); showToast('Restored ' + state.students.length + ' students', 'success');
 }
-
-/* ===== effects ===== */
+/* ===== SFX & VISUAL EFFECTS ===== */
 let audioCtx = null;
 function sfx(type) {
   try {
@@ -1105,7 +921,7 @@ function sfx(type) {
 }
 function celebrate() {
   if (typeof confetti !== 'function') return;
-  const base = { colors:['#fdcb6e', '#fd79a8', '#6c5ce7', '#00cec9', '#74b9ff'], shapes:['star', 'circle'], scalar:1.2, zIndex:140 };
+  const base = { colors: ['#fdcb6e', '#fd79a8', '#6c5ce7', '#00cec9', '#74b9ff'], shapes:['star', 'circle'], scalar: 1.2, zIndex: 140 };
   confetti(Object.assign({}, base, { particleCount:70, angle:60, spread:70, origin:{ x:0, y:.7 } }));
   confetti(Object.assign({}, base, { particleCount:70, angle:120, spread:70, origin:{ x:1, y:.7 } }));
 }
@@ -1113,12 +929,14 @@ function starPop(text) { const d = document.createElement('div'); d.className = 
 function levelUp(lv) {
   sfx('level'); celebrate(); setTimeout(celebrate, 350); bg.boost = 1.5;
   const d = document.createElement('div'); d.className = 'levelup';
-  d.innerHTML = `<div class="big">${lv.icon}</div><div class="disp neon" style="font-size:clamp(44px,9vw,84px);font-weight:700;margin-top:14px">LEVEL UP!</div><div class="disp" style="font-size:26px;margin-top:8px">You are now a ${esc(lv.name)}</div>`;
+  d.innerHTML = `<div class="big">${lv.icon}</div><div class="disp neon" style="font-size:clamp(44px, 9vw, 84px); font-weight:700;margin-top:14px">LEVEL UP!</div><div class="disp" style="font-size:26px;margin-top:8px">You are now a ${esc(lv.name)}</div>`;
   document.body.appendChild(d); setTimeout(() => d.remove(), 2800);
 }
 function showToast(msg, type = 'info') {
-  const c = $('toast-container'), t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; t.style.opacity = '0'; t.style.transform = 'translateY(8px)';
-  t.style.background = type === 'success' ? '#059669' : type === 'error' ? '#e11d48' : '#4f46e5'; c.appendChild(t);
+  const c = $('toast-container'), t = document.createElement('div'); t.className = 'toast';
+  t.textContent = msg; t.style.opacity = '0'; t.style.transform = 'translateY(8px)';
+  t.style.background = type === 'success' ? '#059669' : type === 'error' ? '#e11d48' : '#4f46e5';
+  c.appendChild(t);
   setTimeout(() => { t.style.opacity = '1'; t.style.transform = 'none'; }, 10);
   setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3400);
 }
