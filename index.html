@@ -7,21 +7,19 @@
 <meta name="robots" content="noindex">
 <title>Star Champions - Class Rewards League</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⭐</text></svg>">
-<link href="https://fonts.googleapis.com/css?family=Fredoka:wght@500;600;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>if (typeof Html5QrcodeScanner === 'undefined') document.write('<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"><\/script>');</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<!-- Supabase Client Library -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<!-- Supabase Realtime & Engine Implementation -->
 <script type="module">
   const SUPABASE_URL = "https://wtqqyadgolqbtoqizfvd.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_TnD-uSOe2lD40FXzP52OKQ_7hjfaC0v";
 
   let supabase = null;
-  let roomName = 'CLASS-1';
+  let roomName = 'CORE-1';
   let subscription = null;
 
   window.CloudInit = function (cfg, room, onRemote) {
@@ -29,65 +27,38 @@
       let first = true;
       const done = (ok) => { if (first) { first = false; resolve(ok); } };
       try {
-        roomName = room || 'CLASS-1';
+        roomName = room || 'CORE-1';
         supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        // Initial Data Fetch
         supabase
           .from('star_champions_rooms')
           .select('json')
           .eq('room', roomName)
           .maybeSingle()
           .then(({ data, error }) => {
-            if (error) {
-              onRemote(false, null, error.message);
-              done(false);
-            } else if (data && data.json) {
-              onRemote(true, data.json, null);
-              done(true);
-            } else {
-              onRemote(false, null, null);
-              done(true);
-            }
+            if (error) { onRemote(false, null, error.message); done(false); }
+            else if (data && data.json) { onRemote(true, data.json, null); done(true); }
+            else { onRemote(false, null, null); done(true); }
           });
-        // Live Realtime Listener
         if (subscription) supabase.removeChannel(subscription);
         subscription = supabase
           .channel(`room:${roomName}`)
-          .on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'star_champions_rooms', filter: `room=eq.${roomName}` },
-            (payload) => {
-              if (payload.new && payload.new.json) {
-                onRemote(true, payload.new.json, null);
-              }
-            }
-          )
-          .subscribe((status) => {
-            if (status === 'SUBSCRIBED') done(true);
-          });
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'star_champions_rooms', filter: `room=eq.${roomName}` },
+            (payload) => { if (payload.new && payload.new.json) onRemote(true, payload.new.json, null); })
+          .subscribe((status) => { if (status === 'SUBSCRIBED') done(true); });
         setTimeout(() => done(false), 9000);
-      } catch (e) {
-        onRemote(false, null, e.message);
-        done(false);
-      }
+      } catch (e) { onRemote(false, null, e.message); done(false); }
     });
   };
 
   window.CloudMutate = async function (fn) {
     if (!supabase) return { result: { error: 'offline' }, st: null };
-    const { data, error } = await supabase
-      .from('star_champions_rooms')
-      .select('json')
-      .eq('room', roomName)
-      .maybeSingle();
+    const { data, error } = await supabase.from('star_champions_rooms').select('json').eq('room', roomName).maybeSingle();
     if (error || !data) return { result: { error: 'no-class' }, st: null };
     const st = data.json;
     const result = fn(st);
     if (result && result.error) return { result, st: null };
     st.savedAt = Date.now();
-    const { error: saveError } = await supabase
-      .from('star_champions_rooms')
-      .upsert({ room: roomName, json: st, saved_at: st.savedAt });
+    const { error: saveError } = await supabase.from('star_champions_rooms').upsert({ room: roomName, json: st, saved_at: st.savedAt });
     if (saveError) return { result: { error: 'cloud-fail' }, st: null };
     return { result, st };
   };
@@ -95,9 +66,7 @@
   window.CloudPublish = async function (payload) {
     if (!supabase) throw new Error('Supabase client not initialized');
     payload.savedAt = Date.now();
-    const { error } = await supabase
-      .from('star_champions_rooms')
-      .upsert({ room: roomName, json: payload, saved_at: payload.savedAt });
+    const { error } = await supabase.from('star_champions_rooms').upsert({ room: roomName, json: payload, saved_at: payload.savedAt });
     if (error) throw error;
     return payload;
   };
@@ -120,13 +89,16 @@ button { font-family:inherit; }
 .mono{font-family:ui-monospace, Consolas, Menlo, monospace}.up{text-transform:uppercase}.b{font-weight:800}
 .tiny{font-size:12px; color:var(--mute)}.small{font-size: 13.5px}.gold{color:#fde68a}.pinkc{color:#f9a8d4}.muted{color:var(--mute)}
 .stack > * + * { margin-top:20px; }
+.shell { position:relative; z-index:10; max-width:1500px; margin:0 auto; display:grid; grid-template-columns:minmax(0,1fr) 340px; align-items:start; }
 .wrap { position:relative; z-index:10; max-width: 1120px; margin:0 auto; padding:26px 16px 70px; width:100%; }
+#side { position:sticky; top:68px; padding:26px 16px 70px 0; max-height:calc(100vh - 68px); overflow-y:auto; }
+@media (max-width:1100px) { .shell{grid-template-columns:minmax(0,1fr);} #side{position:static; max-height:none; padding:0 16px 70px;} }
 .cols-2 { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:16px; }
 .cols-3 { display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:16px; }
 .cols-main { display:grid; grid-template-columns:2fr 1fr; gap:18px; }
 @media (max-width:900px) { .cols-main{grid-template-columns:1fr;} .hide-sm{display:none!important;} }
 .topbar { position:sticky; top:0; z-index:40; padding:10px 16px; background:rgba(10,7,30,.7); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-bottom:1px solid var(--line); }
-.topin { max-width: 1120px; margin:0 auto; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; }
+.topin { max-width: 1500px; margin:0 auto; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; }
 .logo { display:flex; align-items:center; gap: 11px; cursor:pointer; }
 .logo-badge { width:40px; height:40px; border-radius: 12px; display: flex; align-items:center; justify-content:center; font-size:22px; background:linear-gradient(135deg,#fde68a,#f59e0b); box-shadow:0 3px 0 #b45309; }
 .brand { font-size:20px; font-weight:700; line-height:1; }
@@ -200,7 +172,6 @@ label.lbl { display:block; font-size: 12px; font-weight:800; color:#d4d0f5; marg
 .pill-status { display:inline-flex; align-items:center; gap:7px; padding:7px 12px; border-radius:11px; font-size:12.5px; font-weight:700; background:rgba(7,5,20,.6); border:1px solid var(--line); }
 .notice { padding: 13px 15px; border-radius: 14px; font-size:13px; background:rgba(251,191,36,.09); border:1px solid rgba(251,191,36,.4); color:#fde68a; }
 .notice.bad { background:rgba(244,63,94,.1); border-color:rgba(244,63,94,.5); color:#fecdd3; }
-.steps { margin:8px 0 0; padding-left:20px; display:grid; gap:7px; font-size:13px; color:#d4d0f5; }
 .qrbox { background:#fff; padding: 12px; border-radius: 16px; box-shadow:0 0 40px rgba(139,124,246,.4); flex-shrink:0; }
 .star-pop { position:fixed; left:50%; top:42%; z-index:120; pointer-events:none; font-family:'Fredoka', system-ui; font-weight:700; font-size:min(20vw, 140px); color:#fde68a; white-space:nowrap; text-shadow:0 0 40px rgba(253,203,110,.9),0 8px 0 #b45309; animation:starPop 1.3s cubic-bezier(.2,1.4,.4,1) forwards; }
 @keyframes starPop {0%{transform:translate(-50%,-50%) scale(.2) rotate(-20deg);opacity:0} 25%{transform:translate(-50%,-50%) scale(1.15) rotate(5deg);opacity:1} 70%{transform:translate(-50%,-55%) scale(1);opacity:1} 100%{transform:translate(-50%,-120%) scale(.8);opacity:0} }
@@ -228,12 +199,79 @@ label.lbl { display:block; font-size: 12px; font-weight:800; color:#d4d0f5; marg
 .proj .pod-avatar { width:88px; height:88px; font-size:46px; } .proj .p1.pod-avatar { width: 110px; height: 110px; font-size:58px; }
 .proj .stage3d { max-width:860px; } .proj .pod-person { font-size:1.2em; }
 @media (max-width:760px) { .proj-grid{grid-template-columns:1fr;} #projector{padding:14px;} }
+
+/* ===== GATE ===== */
+#gate { position:fixed; inset:0; z-index:300; display:flex; align-items:center; justify-content:center; padding:18px; background:radial-gradient(80% 60% at 50% 0%,#241a5e,#070514 70%); overflow:auto; }
+.core-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+.core-btn { padding:16px 6px; border-radius:16px; border:2px solid rgba(255,255,255,.14); background:rgba(7,5,20,.6); color:#fff; cursor:pointer; font-family:'Fredoka',system-ui; font-weight:700; font-size:15px; line-height:1.2; transition:.15s; }
+.core-btn b { display:block; font-size:30px; }
+.core-btn:hover { border-color:#a78bfa; }
+.core-btn.sel { border-color:#fbbf24; background:rgba(251,191,36,.16); box-shadow:0 0 22px rgba(251,191,36,.35); }
+@media (max-width:420px) { .core-grid{grid-template-columns:repeat(2,1fr);} }
+
+/* ===== COUNTDOWN SIDE PANEL ===== */
+.cd-panel { --school:#4f8dff; --break:#2fe39a; --accent:var(--school); --acs:rgba(79,141,255,.16); --pnl:#141b33; --pnl2:#1a2342; --dim:#7f89ad; --soft:#b6bfdc; --done:#5a6486; border-radius:22px; padding:18px; background:linear-gradient(180deg,var(--acs),rgba(18,14,44,.8) 55%); border:1px solid rgba(255,255,255,.1); backdrop-filter:blur(10px); box-shadow:0 10px 30px rgba(0,0,0,.35); }
+.cd-panel.out { --accent:var(--break); --acs:rgba(47,227,154,.15); }
+.cd-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.cd-head .t { font-weight:800; font-size:15px; display:flex; align-items:center; gap:9px; }
+.cd-logo { width:28px; height:28px; border-radius:9px; background:var(--school); display:grid; place-items:center; font-weight:900; font-size:14px; color:#fff; }
+.cd-tag { font-size:11px; font-weight:700; color:var(--soft); padding:4px 10px; border-radius:99px; background:var(--pnl); border:1px solid var(--line); }
+.cd-kicker { margin-top:16px; display:inline-block; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); background:var(--acs); padding:6px 12px; border-radius:99px; }
+.cd-title { margin-top:10px; font-size:24px; font-weight:900; letter-spacing:-.02em; line-height:1.1; }
+.cd-when { margin-top:4px; font-size:13px; color:var(--soft); }
+.cd-when b { color:#fff; }
+.cd-tiles { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; margin-top:14px; }
+.cd-tiles div { background:var(--pnl); border:1px solid var(--line); border-radius:14px; padding:12px 2px 9px; text-align:center; }
+.cd-tiles b { display:block; font-size:28px; font-weight:900; line-height:1; letter-spacing:-.03em; font-variant-numeric:tabular-nums; }
+.cd-tiles small { display:block; margin-top:6px; font-size:9.5px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); }
+.cd-ms { margin-top:10px; text-align:center; font-family:'JetBrains Mono',ui-monospace,monospace; font-weight:700; font-size:13px; color:var(--dim); }
+.cd-ms span { color:#8ee6ff; }
+.cd-bar { height:9px; border-radius:99px; background:var(--pnl2); overflow:hidden; margin-top:14px; }
+.cd-bar i { display:block; height:100%; width:0; border-radius:99px; background:var(--accent); }
+.cd-prow { display:flex; justify-content:space-between; margin-top:6px; font-size:11px; color:var(--soft); font-weight:600; }
+.cd-prow .pct { color:#fff; font-family:'JetBrains Mono',monospace; }
+.cd-list { margin-top:16px; display:grid; gap:8px; }
+.cd-item { display:flex; align-items:center; gap:10px; padding:9px 11px; border-radius:13px; background:var(--pnl); border:2px solid var(--line); }
+.cd-item.next { border-color:var(--school); background:rgba(79,141,255,.12); }
+.cd-item.live { border-color:var(--break); background:rgba(47,227,154,.13); }
+.cd-item.done { opacity:.5; }
+.cd-n { flex:none; width:26px; height:26px; border-radius:50%; display:grid; place-items:center; font-weight:800; font-size:12px; background:#0b1020; border:2px solid #fff; }
+.cd-item.done .cd-n { border-color:var(--done); color:var(--soft); }
+.cd-i { flex:1; min-width:0; }
+.cd-i .nm { font-weight:800; font-size:12.5px; line-height:1.2; }
+.cd-i .dt { font-size:11px; color:var(--dim); }
+.cd-r { flex:none; text-align:right; font-weight:800; font-size:12px; font-variant-numeric:tabular-nums; }
+.cd-r small { display:block; font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); }
+.cd-foot { margin-top:12px; font-size:10.5px; color:var(--dim); line-height:1.5; }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation:none !important; transition:none !important; } }
 </style>
 </head>
 <body>
 <canvas id="bg3d"></canvas>
 <div class="aurora"></div>
+
+<!-- ===== ENTRY GATE ===== -->
+<div id="gate">
+  <div class="card tc" style="max-width:460px;width:100%">
+    <div style="font-size:50px">⭐</div>
+    <h1 class="hero-title disp neon" style="font-size:38px">Star Champions</h1>
+    <p class="muted small mt8">Pick your core and enter your core's 4-digit password.</p>
+    <form id="gate-form" class="mt16" autocomplete="off">
+      <label class="lbl" style="text-align:left">Which core are you in?</label>
+      <div class="core-grid" id="core-grid">
+        <button type="button" class="core-btn" data-core="1"><b>1</b>Core</button>
+        <button type="button" class="core-btn" data-core="2"><b>2</b>Core</button>
+        <button type="button" class="core-btn" data-core="3"><b>3</b>Core</button>
+        <button type="button" class="core-btn" data-core="4"><b>4</b>Core</button>
+      </div>
+      <label class="lbl mt16" style="text-align:left">Password</label>
+      <input class="field mono tc" id="gate-pass" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="font-size:22px;letter-spacing:.4em" autocomplete="off">
+      <div id="gate-err" class="notice bad mt12 hide"></div>
+      <button class="btn purple lg block mt16" type="submit">Enter</button>
+    </form>
+  </div>
+</div>
+
 <header class="topbar">
 <div class="topin">
 <div class="logo" onclick="switchView('leaderboard')">
@@ -244,16 +282,32 @@ label.lbl { display:block; font-size: 12px; font-weight:800; color:#d4d0f5; marg
 <button class="nav-btn" id="nav-leaderboard" onclick="switchView('leaderboard')"><span data-ic="trophy"></span>Leaderboard</button>
 <button class="nav-btn" id="nav-student" onclick="openStudent()"><span data-ic="user"></span>Student</button>
 <button class="nav-btn" id="nav-teacher" onclick="openTeacher()"><span data-ic="monitor"></span>Teacher</button>
+<button class="nav-btn status" id="core-badge" onclick="switchCore()" title="Switch core">Core ?</button>
 <button class="nav-btn status" id="save-badge" onclick="openSaveModal()"><i class="dot" id="save-dot"></i><span id="save-text">Starting...</span></button>
 </div>
 </div>
 </header>
+<div class="shell">
 <main id="app-content" class="wrap"></main>
+<aside id="side"></aside>
+</div>
 <div id="projector" class="hide"></div>
 <div id="toast-container"></div>
 <div id="modal" onclick="if(event.target===this)closeModal()"><div id="modal-content" class="card"></div></div>
 <input type="file" id="json-import-input" accept=".json, application/json" class="hide" onchange="handleImportFile(event)">
 <script>
+/* ===== SITE GATE SETTINGS ===== */
+const CORE_PASSWORDS = { '1':'9292', '2':'1412', '3':'4314', '4':'9877' };   // <-- one password per core (change them here)
+
+/* Sandboxed previews block real form submission, so route every submit button through a synthetic submit event */
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('button[type=submit]');
+  if (!b || !b.form) return;
+  e.preventDefault();
+  if (!b.form.reportValidity()) return;
+  b.form.dispatchEvent(new Event('submit', { cancelable:true, bubbles:true }));
+}, true);
+
 const IC = {
 trophy:'<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
 user:'<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
@@ -278,9 +332,10 @@ copy:'<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 
 cast:'<path d="M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6M2 12a9 9 0 0 1 8 8M2 16a5 5 0 0 1 4 4M2 20h.01"/>'
 };
 const ic = (n, s = 16) => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n] || ''}</svg>`;
-/* ===== LOCAL STORAGE ===== */
+/* ===== LOCAL STORAGE (separate per core) ===== */
 const Store = (() => {
-const KEY = 'StarCentral_V4', LEGACY = 'ClassroomStarRewards_V3', DBN = 'StarCentralDB', TAG = 'SC4::';
+let KEY = 'StarCentral_V4', TAG = 'SC4::';
+const LEGACY = 'ClassroomStarRewards_V3', DBN = 'StarCentralDB';
 const caps = { local:false, idb:false, tab:false };
 let db = null;
 const parse = s => { try { const o = JSON.parse(s); return (o && Array.isArray(o.students)) ? o: null; } catch (e) { return null; } };
@@ -288,6 +343,8 @@ function openDB() { return new Promise(res => { try { const r = indexedDB.open(D
 function rawGet(k) { return new Promise(res => { if (!db) return res(null); try { const q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); } catch (e) { res(null); } }); }
 function rawPut(k, v) { return new Promise(res => { if (!db) return res(false); try { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => res(true); t.onerror = () => res(false); } catch (e) { res(false); } }); }
 async function init() {
+  const core = window.CORE_ID || 'CORE-1';
+  KEY = 'StarCentral_V4_' + core; TAG = 'SC4::' + core + '::';
   try { localStorage.setItem('_sc_t', '1'); localStorage.removeItem('_sc_t'); caps.local = true; } catch (e) {}
   try { db = await openDB(); caps.idb = !!db; } catch (e) {}
   try { window.name = window.name; caps.tab = true; } catch (e) {}
@@ -297,9 +354,7 @@ async function load() {
   if (caps.local) { try { const s = localStorage.getItem(KEY); if (s) c.push(parse(s)); } catch (e) {} }
   if (caps.idb) { const s = await rawGet(KEY); if (s) c.push(parse(s)); }
   try { if (typeof window.name === 'string' && window.name.startsWith(TAG)) c.push(parse(window.name.slice(TAG.length))); } catch (e) {}
-  let best = c.filter(Boolean).sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0))[0] || null;
-  if (!best && caps.local) { try { const old = parse(localStorage.getItem(LEGACY)); if (old) best = old; } catch (e) {} }
-  return best;
+  return c.filter(Boolean).sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0))[0] || null;
 }
 function save(obj) {
   const str = JSON.stringify(obj);
@@ -307,7 +362,7 @@ function save(obj) {
   if (caps.idb && db) rawPut(KEY, str);
   try { window.name = TAG + str; } catch (e) {}
 }
-return { init, load, save, caps, KEY, parse, rawGet, rawPut };
+return { init, load, save, caps, parse, rawGet, rawPut };
 })();
 /* ===== STATE & CONSTANTS ===== */
 const DEFAULT_PRIZES = () => [
@@ -325,7 +380,7 @@ const LEVELS = [
 ];
 let state = { students: [], prizes: DEFAULT_PRIZES(), currentQrToken:null, activity:[], redemptions:[], settings:{ multiplier: 1, passB64:null, passHash:null }, savedAt:0 };
 let ui = { view:'leaderboard', tab:'roster', teacher:false, activeStudentId:null, projector:null, picked:null };
-const Cloud = { configured:true, cfg:null, room: 'CLASS-1', on:false, exists:false, error:null, pub:false };
+const Cloud = { configured:true, cfg:null, room: 'CORE-1', on:false, exists:false, error:null, pub:false };
 const FileSave = { handle:null, status:'off', timer:null, last:null, supported:(typeof window.showSaveFilePicker === 'function') };
 let html5QrScanner = null, claiming = false, pendingConfirm = null, lastSaveTime = null;
 const $ = id => document.getElementById(id);
@@ -371,22 +426,27 @@ async function mutate(fn) {
   return res || { ok:true };
 }
 function explainError(res) {
-  const m = { 'no-class': 'Class data not found.', 'bad-code': 'Code is invalid or expired!', 'no-student': 'Student account not found.', offline: 'Not connected to backend.', 'cloud-fail': 'Database write failed.' };
+  const m = { 'no-class': 'Class data not found. A teacher needs to unlock the Teacher Hub once to set up this core.', 'bad-code': 'Code is invalid or expired!', 'no-student': 'Student account not found.', offline: 'Not connected to backend.', 'cloud-fail': 'Database write failed.' };
   return m[res.error] || 'An unexpected error occurred.';
 }
 /* ===== OPTIONAL FILE WRITER ===== */
 async function fileInit() {
   if (!FileSave.supported) return;
-  const h = await Store.rawGet('fileHandle'); if (!h) return; FileSave.handle = h;
+  const h = await Store.rawGet('fileHandle_' + window.CORE_ID); if (!h) return; FileSave.handle = h;
   try { FileSave.status = (await h.queryPermission({ mode:'readwrite' })) === 'granted' ? 'on': 'needs-permission'; } catch (e) { FileSave.status = 'needs-permission'; }
 }
 async function fileLink() {
   if (!FileSave.supported) { showToast('Browser does not support direct file saving.', 'info'); return; }
   try {
-    const h = await window.showSaveFilePicker({ suggestedName: 'StarChampions-data.json', types:[{ description: 'JSON File', accept: { 'application/json': ['.json'] } }] });
-    FileSave.handle = h; FileSave.status = 'on'; await Store.rawPut('fileHandle', h); await fileWrite();
+    const h = await window.showSaveFilePicker({ suggestedName: 'StarChampions-' + window.CORE_ID + '-data.json', types:[{ description: 'JSON File', accept: { 'application/json': ['.json'] } }] });
+    FileSave.handle = h; FileSave.status = 'on'; await Store.rawPut('fileHandle_' + window.CORE_ID, h); await fileWrite();
     showToast('Linked! Changes auto-save to file.', 'success'); updateSaveBadge(); refreshSaveCenter();
   } catch (e) { if (e && e.name !== 'AbortError') showToast('File access denied.', 'info'); }
+}
+async function fileReconnect() {
+  if (!FileSave.handle) return;
+  try { const p = await FileSave.handle.requestPermission({ mode:'readwrite' }); FileSave.status = p === 'granted' ? 'on' : 'needs-permission'; if (p === 'granted') await fileWrite(); } catch (e) {}
+  updateSaveBadge(); refreshSaveCenter();
 }
 async function fileWrite() {
   if (!FileSave.handle || FileSave.status !== 'on') return;
@@ -398,7 +458,7 @@ function updateSaveBadge() {
   const t = $('save-text'), d = $('save-dot'); if (!t) return;
   let txt, cls = '';
   if (Cloud.configured) {
-    if (Cloud.on) txt = 'Supabase Sync';
+    if (Cloud.on) txt = 'Live Sync';
     else if (Cloud.error) { txt = 'Cloud Error'; cls = 'bad'; }
     else { txt = 'Connecting...'; cls = 'warn'; }
   } else { txt = 'Local Device Only'; cls = 'warn'; }
@@ -495,7 +555,38 @@ async function boot() {
   updateNav(); renderView(ui.view); updateSaveBadge();
   connectCloud();
 }
-window.addEventListener('DOMContentLoaded', boot);
+/* ===== GATE LOGIC ===== */
+let gateCore = null;
+function startApp(n) {
+  window.CORE_ID = 'CORE-' + n; Cloud.room = window.CORE_ID;
+  $('gate').classList.add('hide');
+  $('core-badge').textContent = 'Core ' + n;
+  boot(); startCountdown();
+}
+function initGate() {
+  document.querySelectorAll('[data-ic]').forEach(e => { e.innerHTML = ic(e.dataset.ic, 16); });
+  let c = null; try { c = sessionStorage.getItem('sc_core'); } catch (e) {}
+  if (c && /^[1-4]$/.test(c)) { startApp(c); return; }
+  document.querySelectorAll('.core-btn').forEach(b => b.addEventListener('click', () => {
+    gateCore = b.dataset.core;
+    document.querySelectorAll('.core-btn').forEach(x => x.classList.toggle('sel', x === b));
+    $('gate-pass').focus();
+  }));
+  $('gate-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const err = $('gate-err'), show = m => { err.textContent = m; err.classList.remove('hide'); };
+    if (!gateCore) { show('Pick your core first.'); return; }
+    if ($('gate-pass').value.trim() !== CORE_PASSWORDS[gateCore]) { show('Wrong password for Core ' + gateCore + '. Try again.'); $('gate-pass').value = ''; return; }
+    try { sessionStorage.setItem('sc_core', gateCore); } catch (e2) {}
+    startApp(gateCore);
+  });
+}
+function switchCore() {
+  try { sessionStorage.removeItem('sc_core'); sessionStorage.removeItem('sc_ui'); } catch (e) {}
+  try { window.name = ''; } catch (e) {}
+  location.reload();
+}
+window.addEventListener('DOMContentLoaded', initGate);
 async function connectCloud() {
   if (!window.CloudInit) { Cloud.error = 'Cloud Client Missing'; updateSaveBadge(); softRerender(); return; }
   await window.CloudInit(Cloud.cfg, Cloud.room, (exists, data, err) => {
@@ -563,7 +654,7 @@ function postRender(quiet) {
 }
 function connNotice() {
   if (!Cloud.configured || Cloud.on) return '';
-  return Cloud.error ? `<div class="notice bad">Cloud Engine Offline (${esc(Cloud.error)}). Check configuration.</div>` : '<div class="notice">Connecting to Supabase...</div>';
+  return Cloud.error ? `<div class="notice bad">Cloud Engine Offline (${esc(Cloud.error)}). Check configuration.</div>` : '<div class="notice">Connecting...</div>';
 }
 /* ===== HTML COMPONENT GENERATORS ===== */
 function podiumHTML(top3) {
@@ -679,9 +770,9 @@ function prizesTabHTML() {
 }
 function saveCenterHTML() {
   const local = Store.caps.local || Store.caps.idb;
-  const pills = `<div class="flex fw gap8"><span class="pill-status"><i class="dot ${Cloud.configured ? (Cloud.on ? '' : 'bad') : 'warn'}"></i>Database: ${Cloud.configured ? (Cloud.on ? 'Supabase Live' : (Cloud.error ? 'Error' : 'Connecting')) : 'Not configured'}</span><span class="pill-status"><i class="dot ${local ? '' : 'warn'}"></i>This Device Cache: ${local ? 'Active' : 'Disabled'}</span></div>`;
+  const pills = `<div class="flex fw gap8"><span class="pill-status"><i class="dot ${Cloud.configured ? (Cloud.on ? '' : 'bad') : 'warn'}"></i>Database: ${Cloud.configured ? (Cloud.on ? 'Live' : (Cloud.error ? 'Error' : 'Connecting')) : 'Not configured'}</span><span class="pill-status"><i class="dot ${local ? '' : 'warn'}"></i>This Device Cache: ${local ? 'Active' : 'Disabled'}</span><span class="pill-status">Room: ${esc(Cloud.room)}</span></div>`;
   const fileState = !FileSave.supported ? 'Unavailable' : FileSave.handle ? (FileSave.status === 'on' ? 'Linked, Auto-Saving' : 'Needs Permission') : 'Not Linked';
-  return `<div class="stack"><div class="card"><h3 class="ctitle disp">Supabase Backend Status</h3><div class="mt12">${pills}${Cloud.error ? `<div class="notice bad mt12">Error: <b>${esc(Cloud.error)}</b></div>` : ''}<p class="tiny mt16">Your room database is live and streaming postgres_changes across all connected student devices.</p></div></div><div class="card"><h3 class="ctitle disp">File System &amp; Backups</h3><p class="tiny mt8">File status: <b>${fileState}</b>.</p><div class="flex fw gap8 mt12">${FileSave.handle && FileSave.status !== 'on' ? '<button class="btn goldb sm" onclick="fileReconnect()"><span data-ic="folder"></span>Reconnect File</button>' : `<button class="btn green sm" onclick="fileLink()"><span data-ic="folder"></span>${FileSave.handle ? 'Change File' : 'Auto-save to File'}</button>`}<button class="btn blue sm" onclick="downloadBackup()"><span data-ic="download"></span>Download JSON</button><button class="btn slate sm" onclick="triggerImportFile()"><span data-ic="upload"></span>Restore JSON</button></div></div></div>`;
+  return `<div class="stack"><div class="card"><h3 class="ctitle disp">Database Status</h3><div class="mt12">${pills}${Cloud.error ? `<div class="notice bad mt12">Error: <b>${esc(Cloud.error)}</b></div>` : ''}<p class="tiny mt16">This core's room is live and streams changes across all connected student devices.</p></div></div><div class="card"><h3 class="ctitle disp">File System &amp; Backups</h3><p class="tiny mt8">File status: <b>${fileState}</b>.</p><div class="flex fw gap8 mt12">${FileSave.handle && FileSave.status !== 'on' ? '<button class="btn goldb sm" onclick="fileReconnect()"><span data-ic="folder"></span>Reconnect File</button>' : `<button class="btn green sm" onclick="fileLink()"><span data-ic="folder"></span>${FileSave.handle ? 'Change File' : 'Auto-save to File'}</button>`}<button class="btn blue sm" onclick="downloadBackup()"><span data-ic="download"></span>Download JSON</button><button class="btn slate sm" onclick="triggerImportFile()"><span data-ic="upload"></span>Restore JSON</button></div></div></div>`;
 }
 function refreshSaveCenter() { const e = $('save-center'); if (e) { e.innerHTML = saveCenterHTML(); postRender(true); } }
 function refreshTeacherLists() {
@@ -699,7 +790,7 @@ function renderTeacherDashboardView() {
   const mult = state.settings.multiplier || 1, tab = ui.tab || 'roster', pend = state.redemptions.filter(x => !x.done).length;
   const cdot = Cloud.configured ? (Cloud.on ? '' : 'bad') : 'warn';
   const body = tab === 'prizes' ? prizesTabHTML() : tab === 'setup' ? `<div id="save-center">${saveCenterHTML()}</div>` : rosterTabHTML();
-  return `<div class="stack"><div class="flex jb ac fw gap16"><div><span class="chip">TEACHER HUB</span><h2 class="hero-title disp neon mt8" style="font-size:36px">Command Center</h2><p class="tiny mt8">Students: <b style="color:#fff" id="roster-count">${state.students.length}</b> • Claims Waiting: <b class="gold" id="claims-pending">${pend}</b></p></div><div class="flex fw gap8"><button class="btn goldb sm" onclick="openPicker()"><span data-ic="dice"></span>Random Picker</button><button class="btn slate sm" onclick="openProjector('board')"><span data-ic="cast"></span>Projector</button><button class="btn slate sm" onclick="openSettings()"><span data-ic="sliders"></span>Settings</button><button class="btn slate sm" onclick="lockTeacher()"><span data-ic="lock"></span>Lock</button></div></div>${Cloud.configured&&!Cloud.on?connNotice():''}<div class="card gold-b"><div class="flex ac gap24 fw jc"><div class="qrbox"><div id="teacher-active-qr-canvas"></div></div><div class="f1" style="min-width:250px"><span class="chip gold">STAR DISPENSER</span><div class="mono b gold mt8" style="font-size:34px;letter-spacing:.2em" id="teacher-token-label">${esc(state.currentQrToken)}</div><p class="tiny mt4">Each scan gives <b class="gold">+${mult} star${mult > 1 ? 's' : ''}</b>, then changes.</p><div class="flex fw gap8 mt12 ac"><button class="btn goldb" onclick="openProjector('qr')"><span data-ic="cast"></span>Project Full Screen</button><button class="btn slate sm" onclick="manualRegenerateQr()"><span data-ic="rotate"></span>New Code</button></div><div class="flex fw gap8 mt12 ac"><span class="tiny b">Star Power:</span>${[1, 2, 3].map(n => `<button class="btn sm ${mult===n?'goldb':'slate'}" onclick="setMultiplier(${n})">${n}x</button>`).join('')}</div></div></div></div><div><div class="tabs"><button class="tab ${tab === 'roster' ? 'active' : ''}" onclick="setTab('roster')"><span data-ic="users"></span>Roster</button><button class="tab ${tab === 'prizes' ? 'active' : ''}" onclick="setTab('prizes')"><span data-ic="gift"></span>Prize Store ${pend ? '<span class="chip gold">' + pend + '</span>' : ''}</button><button class="tab ${tab === 'setup' ? 'active' : ''}" onclick="setTab('setup')"><i class="dot ${cdot}"></i>Database Engine</button></div><div class="mt16">${body}</div></div></div>`;
+  return `<div class="stack"><div class="flex jb ac fw gap16"><div><span class="chip">TEACHER HUB • ${esc(Cloud.room)}</span><h2 class="hero-title disp neon mt8" style="font-size:36px">Command Center</h2><p class="tiny mt8">Students: <b style="color:#fff" id="roster-count">${state.students.length}</b> • Claims Waiting: <b class="gold" id="claims-pending">${pend}</b></p></div><div class="flex fw gap8"><button class="btn goldb sm" onclick="openPicker()"><span data-ic="dice"></span>Random Picker</button><button class="btn slate sm" onclick="openProjector('board')"><span data-ic="cast"></span>Projector</button><button class="btn slate sm" onclick="openSettings()"><span data-ic="sliders"></span>Settings</button><button class="btn slate sm" onclick="lockTeacher()"><span data-ic="lock"></span>Lock</button></div></div>${Cloud.configured&&!Cloud.on?connNotice():''}<div class="card gold-b"><div class="flex ac gap24 fw jc"><div class="qrbox"><div id="teacher-active-qr-canvas"></div></div><div class="f1" style="min-width:250px"><span class="chip gold">STAR DISPENSER</span><div class="mono b gold mt8" style="font-size:34px;letter-spacing:.2em" id="teacher-token-label">${esc(state.currentQrToken)}</div><p class="tiny mt4">Each scan gives <b class="gold">+${mult} star${mult > 1 ? 's' : ''}</b>, then changes.</p><div class="flex fw gap8 mt12 ac"><button class="btn goldb" onclick="openProjector('qr')"><span data-ic="cast"></span>Project Full Screen</button><button class="btn slate sm" onclick="manualRegenerateQr()"><span data-ic="rotate"></span>New Code</button></div><div class="flex fw gap8 mt12 ac"><span class="tiny b">Star Power:</span>${[1, 2, 3].map(n => `<button class="btn sm ${mult===n?'goldb':'slate'}" onclick="setMultiplier(${n})">${n}x</button>`).join('')}</div></div></div></div><div><div class="tabs"><button class="tab ${tab === 'roster' ? 'active' : ''}" onclick="setTab('roster')"><span data-ic="users"></span>Roster</button><button class="tab ${tab === 'prizes' ? 'active' : ''}" onclick="setTab('prizes')"><span data-ic="gift"></span>Prize Store ${pend ? '<span class="chip gold">' + pend + '</span>' : ''}</button><button class="tab ${tab === 'setup' ? 'active' : ''}" onclick="setTab('setup')"><i class="dot ${cdot}"></i>Database Engine</button></div><div class="mt16">${body}</div></div></div>`;
 }
 function renderTeacherQrCanvas() { drawQR($('teacher-active-qr-canvas'), state.currentQrToken, 170); }
 async function manualRegenerateQr() {
@@ -710,7 +801,7 @@ async function setMultiplier(n) {
   await mutate(st => { st.settings.multiplier = n; return { ok:true }; });
   sfx('pop'); showToast(n > 1 ? `${n}x Star Power active!` : 'Standard points restored', 'success'); renderView('teacher-dashboard');
 }
-/* ===== PASSWORD SYSTEM ===== */
+/* ===== PASSWORD SYSTEM (teacher) ===== */
 async function hashPw(p) {
   try {
     if (window.crypto && crypto.subtle) {
@@ -890,11 +981,11 @@ function newSeason() {
 }
 function openSaveModal() {
   const c = Store.caps, row = (ok, label) => `<div class="feed flex jb"><span>${label}</span><b style="color:${ok ? '#34d399' : '#94a3b8'}">${ok ? 'Active' : 'Disabled'}</b></div>`;
-  const cloudTxt = Cloud.configured ? (Cloud.on ? 'Supabase Database Connected Realtime' : (Cloud.error ? 'Connection Failure: ' + esc(Cloud.error) : 'Connecting...')) : 'Offline Mode';
+  const cloudTxt = Cloud.configured ? (Cloud.on ? 'Connected (' + esc(Cloud.room) + ')' : (Cloud.error ? 'Connection Failure: ' + esc(Cloud.error) : 'Connecting...')) : 'Offline Mode';
   openModal(modalHead('Database & Storage Diagnostics') + `<div class="feed mt12"><span>☁️</span><div><b>Backend:</b> ${cloudTxt}</div></div><div style="display:grid;gap:7px" class="mt12">${row(c.local, 'Browser LocalStorage')}${row(c.idb,'Browser IndexedDB')}</div>${ui.teacher ? '<button class="btn purple block mt16" onclick="closeModal(); setTab(\'setup\')">Open Database Engine</button>' : ''}`);
 }
 function downloadBackup() {
-  try { const blob = new Blob([JSON.stringify(getPayload(), null, 2)], { type:'application/json' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'StarChampions_Backup_' + new Date().toISOString().slice(0, 10) + '.json'; document.body.appendChild(a); a.click(); a.remove(); showToast('Backup file generated', 'success'); }
+  try { const blob = new Blob([JSON.stringify(getPayload(), null, 2)], { type:'application/json' }), a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'StarChampions_' + window.CORE_ID + '_Backup_' + new Date().toISOString().slice(0, 10) + '.json'; document.body.appendChild(a); a.click(); a.remove(); showToast('Backup file generated', 'success'); }
   catch (e) { showToast('File export failed.', 'info'); }
 }
 function triggerImportFile() { $('json-import-input').click(); }
@@ -939,6 +1030,92 @@ function showToast(msg, type = 'info') {
   c.appendChild(t);
   setTimeout(() => { t.style.opacity = '1'; t.style.transform = 'none'; }, 10);
   setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3400);
+}
+
+/* ===================================================================
+   TRACK 2 COUNTDOWN (side panel)
+   =================================================================== */
+const DISMISS = { h:15, m:0 };   // school lets out 3:00 PM
+const RETURN  = { h:7,  m:30 };  // first morning back 7:30 AM
+// month is 0-indexed
+const RAW = [
+  { name:'Late Summer Track-Out',  out:[2026,7,21],  back:[2026,8,14] },
+  { name:'Thanksgiving Track-Out', out:[2026,10,13], back:[2026,11,7] },
+  { name:'Winter Break',           out:[2026,11,18], back:[2027,0,4] },
+  { name:'Winter Track-Out',       out:[2027,1,12],  back:[2027,2,8] },
+  { name:'Spring Track-Out',       out:[2027,4,7],   back:[2027,5,4] },
+  { name:'Summer Break',           out:[2027,5,29],  back:null, last:true },
+];
+const mkT = (a, t) => new Date(a[0], a[1], a[2], t.h, t.m, 0, 0).getTime();
+const EV = RAW.map((e, i) => ({ ...e, i, start:mkT(e.out, DISMISS), end:e.back ? mkT(e.back, RETURN) : Infinity }));
+const YEAR_START = new Date(2026, 6, 7, RETURN.h, RETURN.m).getTime();
+const cdPad = (n, l = 2) => String(n).padStart(l, '0');
+const cdD = (ms, o) => new Date(ms).toLocaleDateString(undefined, o);
+const cdT = ms => new Date(ms).toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' });
+const SHORT = { weekday:'short', month:'short', day:'numeric' };
+function cdSplit(ms) {
+  ms = Math.max(0, ms);
+  const d = Math.floor(ms / 864e5); ms -= d * 864e5;
+  const h = Math.floor(ms / 36e5); ms -= h * 36e5;
+  const m = Math.floor(ms / 6e4); ms -= m * 6e4;
+  const s = Math.floor(ms / 1e3); ms -= s * 1e3;
+  return { d, h, m, s, ms:Math.floor(ms) };
+}
+let cdStarted = false, cdPhase = null;
+function startCountdown() {
+  if (cdStarted) return; cdStarted = true;
+  $('side').innerHTML = `<div class="cd-panel" id="cd-panel">
+    <div class="cd-head"><div class="t"><div class="cd-logo">2</div>Track 2 Countdown</div><span class="cd-tag">7th Grade • WCPSS 26–27</span></div>
+    <div class="cd-kicker" id="cd-kicker">Next track-out in</div>
+    <div class="cd-title" id="cd-title">—</div>
+    <div class="cd-when" id="cd-when"></div>
+    <div class="cd-tiles">
+      <div><b id="cd-d">0</b><small>Days</small></div><div><b id="cd-h">00</b><small>Hours</small></div>
+      <div><b id="cd-m">00</b><small>Min</small></div><div><b id="cd-s">00</b><small>Sec</small></div>
+    </div>
+    <div class="cd-ms"><span id="cd-ms">000</span> ms</div>
+    <div class="cd-bar"><i id="cd-fill"></i></div>
+    <div class="cd-prow"><span id="cd-pl"></span><span class="pct" id="cd-pc">0%</span><span id="cd-pr"></span></div>
+    <div class="cd-list" id="cd-list">${EV.map(e => `<div class="cd-item" id="ci${e.i}"><div class="cd-n">${e.last ? '★' : e.i + 1}</div><div class="cd-i"><div class="nm">${e.name}</div><div class="dt">${e.last ? 'Last day: ' : ''}${cdD(e.start, SHORT)}${e.back ? ' → ' + cdD(e.end, SHORT) : ''}</div></div><div class="cd-r" id="cr${e.i}"></div></div>`).join('')}</div>
+    <div class="cd-foot">Dates follow the WCPSS 26-27 Year-Round Multi-Track Calendar (Track 2). Countdowns end at ${cdT(EV[0].start)} dismissal; "back to school" uses ${cdT(EV[0].end)}. Weather make-up days can change the calendar — confirm at wcpss.net/calendars.</div>
+  </div>`;
+  cdTick(); setInterval(cdTick, 100);
+}
+function cdTick() {
+  const now = Date.now();
+  let act = EV.find(e => now < e.end);
+  const allDone = !act; if (!act) act = EV[EV.length - 1];
+  const inBreak = !allDone && now >= act.start;
+  const panel = $('cd-panel'); if (!panel) return;
+  panel.classList.toggle('out', inBreak || allDone);
+  const phase = allDone ? 'done' : (inBreak ? 'out' : 'in') + act.i;
+  const prev = EV[act.i - 1];
+  if (phase !== cdPhase) {
+    if (cdPhase && inBreak) celebrate();
+    cdPhase = phase;
+    if (allDone) { $('cd-kicker').textContent = 'Track 2 year complete'; $('cd-title').textContent = 'Enjoy summer! ☀️'; $('cd-when').textContent = ''; }
+    else if (inBreak) { $('cd-kicker').textContent = "🎉 Tracked out — back to school in"; $('cd-title').textContent = act.name; $('cd-when').innerHTML = `Back on <b>${cdD(act.end, { weekday:'long', month:'long', day:'numeric' })}</b> at ${cdT(act.end)}`; }
+    else { $('cd-kicker').textContent = act.last ? 'Countdown to summer break' : 'Next track-out in'; $('cd-title').textContent = act.name; $('cd-when').innerHTML = `<b>${cdD(act.start, { weekday:'long', month:'long', day:'numeric' })}</b> at ${cdT(act.start)}`; }
+    $('cd-pl').textContent = inBreak ? 'Track-out started' : (prev ? 'Back in school' : 'School year started');
+    $('cd-pr').textContent = inBreak ? 'Back to school' : 'Track-out';
+  }
+  const target = allDone ? now : (inBreak ? act.end : act.start);
+  const p = cdSplit(target - now);
+  $('cd-d').textContent = p.d; $('cd-h').textContent = cdPad(p.h); $('cd-m').textContent = cdPad(p.m); $('cd-s').textContent = cdPad(p.s); $('cd-ms').textContent = cdPad(p.ms, 3);
+  const from = inBreak ? act.start : (prev ? prev.end : YEAR_START), to = inBreak ? act.end : act.start;
+  const pct = allDone ? 100 : Math.min(Math.max((now - from) / (to - from), 0), 1) * 100;
+  $('cd-fill').style.width = pct + '%'; $('cd-pc').textContent = pct.toFixed(2) + '%';
+  const nextEv = EV.find(x => now < x.end);
+  EV.forEach(e => {
+    const el = $('ci' + e.i), r = $('cr' + e.i); if (!el) return;
+    let cls = 'cd-item', html;
+    if (now >= e.end) { cls += ' done'; html = e.last ? '🎉' : '✓ Done'; }
+    else if (now >= e.start) { cls += ' live'; const q = cdSplit(e.end - now); html = `${q.d}d ${cdPad(q.h)}h<small>Live now</small>`; }
+    else { if (e === nextEv && !inBreak) cls += ' next'; const q = cdSplit(e.start - now); html = `${q.d}d ${cdPad(q.h)}h<small>${cls.includes('next') ? 'Up next' : 'Upcoming'}</small>`; }
+    if (el.className !== cls) el.className = cls;
+    if (r.innerHTML !== html) r.innerHTML = html;
+  });
+  document.title = allDone ? 'Star Champions' : `⭐ Star Champions • ${p.d}d ${cdPad(p.h)}:${cdPad(p.m)}:${cdPad(p.s)}`;
 }
 </script>
 </body>
