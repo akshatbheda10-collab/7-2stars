@@ -299,6 +299,16 @@ label.lbl { display:block; font-size: 12px; font-weight:800; color:#d4d0f5; marg
 .slides-overlay { position:absolute; inset:0; z-index:5; display:flex; align-items:center; justify-content:center; padding:16px; background:rgba(7,5,20,.9); overflow:auto; }
 .slides-form { width:100%; max-width:560px; }
 
+.split-wrap { position:absolute; inset:0; display:flex; }
+.proj.split .slides-stage { position:relative; inset:auto; flex:1; min-width:0; }
+.split-board { width:var(--bw); flex:none; overflow-y:auto; padding:66px 14px 16px; background:linear-gradient(180deg,#120d34,#070514); border-left:1px solid rgba(255,255,255,.1); }
+.split-title { font-size:26px; font-weight:700; text-align:center; }
+.split-list { display:grid; gap:8px; margin-top:14px; }
+.split-board .bar { display:none; }
+.split-board .srow { padding:8px 10px; gap:9px; }
+.split-board .av { font-size:22px; width:30px; } .split-board .sname { font-size:14px; }
+@media (max-width:760px) { .split-wrap { flex-direction:column; } .split-board { width:auto; max-height:42%; border-left:0; border-top:1px solid rgba(255,255,255,.1); padding-top:12px; } }
+
 /* countdown panel */
 .cd-panel { backdrop-filter:none; -webkit-backdrop-filter:none; background:linear-gradient(180deg, var(--acs), rgba(20,16,50,.92) 55%); }
 .cd-head .t, .cd-tag { white-space:nowrap; }
@@ -512,7 +522,7 @@ async function mutate(fn) {
     try {
       const r = await window.CloudMutate(fn);
       if (r.result && r.result.error) return r.result;
-      if (r.st) { applyData(r.st); Store.save(getPayload()); lastSaveTime = Date.now(); scheduleFileWrite(); updateSaveBadge(); }
+      if (r.st) { applyData(r.st); Store.save(getPayload()); lastSaveTime = Date.now(); scheduleFileWrite(); updateSaveBadge(); if (ui.projector) softRerender(); }
       return r.result || { ok:true };
     } catch (e) { console.error(e); showToast('Cloud save failed.', 'error'); return { error:'cloud-fail' }; }
   }
@@ -747,7 +757,7 @@ async function publishToCloud() {
 let rrT = 0;
 function softRerender() { if (rrT) return; rrT = setTimeout(() => { rrT = 0; softRerenderNow(); }, 120); }
 function softRerenderNow() {
-  if (ui.projector) { if (ui.projector.mode !== 'slides') renderProjector(); return; }
+  if (ui.projector) { const m = ui.projector.mode; if (m === 'split') updateSplitBoard(); else if (m !== 'slides') renderProjector(); return; }
   if ($('modal').classList.contains('open')) return;
   const v = ui.view;
   if (['leaderboard', 'student-dashboard', 'student-shop'].includes(v)) {
@@ -815,10 +825,10 @@ function standingRow(s, rank, leader) {
 }
 function renderLeaderboardView() {
   const sorted = getSortedStudents(), top3 = sorted.slice(0, 3), leader = sorted.length ? sorted[0].totalEarned : 0, mult = state.settings.multiplier || 1;
-  return `<div class="stack">${connNotice()}<div class="tc"><h2 class="hero-title disp neon">Class Leaderboard</h2><p class="muted small mt8">Scan codes, hit goals, climb the ranks. Lifetime stars decide your rank!</p><div class="mt16 flex jc fw gap8"><button class="btn slate sm" onclick="openProjector('board')"><span data-ic="cast"></span>Projector Mode</button><button class="btn slate sm" onclick="openProjector('slides')"><span data-ic="slides"></span>Show Slides</button></div></div>${mult > 1 ? `<div class="card gold-b tc disp b gold" style="font-size:21px">🔥 STAR POWER IS ON! Every scan = +${mult} stars</div>` : ''}${(state.students.length === 0 && !Cloud.loaded && !Cloud.error) ? '<div class="card tc" style="max-width:440px;margin:0 auto"><div style="font-size:48px">⏳</div><h3 class="ctitle mt8">Loading your class…</h3><p class="muted small mt8">Connecting to live data.</p></div>' : state.students.length === 0 ? `<div class="card tc" style="max-width:440px;margin:0 auto"><div style="font-size:48px">📋</div><h3 class="ctitle mt8">No students yet</h3><p class="muted small mt8">Ask your teacher to add students in the Teacher Hub.</p><button class="btn purple mt16" onclick="openTeacher()">Open Teacher Hub</button></div>` : `${podiumHTML(top3)}<div class="cols-main"><div class="card"><div class="flex jb ac"><h3 class="ctitle disp">Standings</h3><span class="tiny">${sorted.length} students</span></div><div class="scroll mt16" style="max-height:560px; display:grid; gap:8px">${sorted.map((s,i)=>standingRow(s,i+1,leader)).join('')}</div></div><div class="card"><h3 class="ctitle disp">Live Activity</h3><div class="scroll mt16" style="max-height:560px;display:grid;gap:8px">${state.activity.length === 0 ? '<p class="tiny">Nothing yet. Be the first to scan a code!</p>' : state.activity.map(a => `<div class="feed"><span style="font-size:18px">${a.icon}</span><div><div>${esc(a.msg)}</div><div class="tiny">${clock(a.t)}</div></div></div>`).join('')}</div></div></div>`}</div>`;
+  return `<div class="stack">${connNotice()}<div class="tc"><h2 class="hero-title disp neon">Class Leaderboard</h2><p class="muted small mt8">Scan codes, hit goals, climb the ranks. Lifetime stars decide your rank!</p><div class="mt16 flex jc fw gap8"><button class="btn slate sm" onclick="openProjector('board')"><span data-ic="cast"></span>Projector Mode</button><button class="btn slate sm" onclick="openProjector('slides')"><span data-ic="slides"></span>Show Slides</button><button class="btn slate sm" onclick="openProjector('split')"><span data-ic="slides"></span>Split View</button></div></div>${mult > 1 ? `<div class="card gold-b tc disp b gold" style="font-size:21px">🔥 STAR POWER IS ON! Every scan = +${mult} stars</div>` : ''}${(state.students.length === 0 && !Cloud.loaded && !Cloud.error) ? '<div class="card tc" style="max-width:440px;margin:0 auto"><div style="font-size:48px">⏳</div><h3 class="ctitle mt8">Loading your class…</h3><p class="muted small mt8">Connecting to live data.</p></div>' : state.students.length === 0 ? `<div class="card tc" style="max-width:440px;margin:0 auto"><div style="font-size:48px">📋</div><h3 class="ctitle mt8">No students yet</h3><p class="muted small mt8">Ask your teacher to add students in the Teacher Hub.</p><button class="btn purple mt16" onclick="openTeacher()">Open Teacher Hub</button></div>` : `${podiumHTML(top3)}<div class="cols-main"><div class="card"><div class="flex jb ac"><h3 class="ctitle disp">Standings</h3><span class="tiny">${sorted.length} students</span></div><div class="scroll mt16" style="max-height:560px; display:grid; gap:8px">${sorted.map((s,i)=>standingRow(s,i+1,leader)).join('')}</div></div><div class="card"><h3 class="ctitle disp">Live Activity</h3><div class="scroll mt16" style="max-height:560px;display:grid;gap:8px">${state.activity.length === 0 ? '<p class="tiny">Nothing yet. Be the first to scan a code!</p>' : state.activity.map(a => `<div class="feed"><span style="font-size:18px">${a.icon}</span><div><div>${esc(a.msg)}</div><div class="tiny">${clock(a.t)}</div></div></div>`).join('')}</div></div></div>`}</div>`;
 }
 /* ===== Google Slides in projector mode ===== */
-const slidesCfg = { url:'', auto:false, secs:5, loop:true, alt:false };
+const slidesCfg = { url:'', auto:false, secs:5, loop:true, alt:false, split:2 };
 const slidesKey = () => 'sc_slides_' + (window.CORE_ID || 'x');
 function loadSlidesCfg() { try { Object.assign(slidesCfg, JSON.parse(localStorage.getItem(slidesKey()) || '{}')); } catch (e) {} }
 function saveSlidesCfg() { try { localStorage.setItem(slidesKey(), JSON.stringify(slidesCfg)); } catch (e) {} }
@@ -857,9 +867,16 @@ function clearSlides() { slidesCfg.url = ''; saveSlidesCfg(); renderProjector(tr
 function toggleAltViewer() { slidesCfg.alt = !slidesCfg.alt; saveSlidesCfg(); renderProjector(true); }
 function reloadSlides() { const f = $('slides-frame'); if (f) f.src = f.src; }
 
+const SPLIT_W = { 1:'clamp(240px,22vw,360px)', 2:'clamp(280px,30vw,460px)', 3:'clamp(320px,40vw,620px)' };
+function splitBoardHTML() {
+  const sorted = getSortedStudents(), leader = sorted.length ? sorted[0].totalEarned : 0, mult = state.settings.multiplier || 1;
+  return `<div class="split-title disp neon">⭐ Leaderboard</div>${mult > 1 ? `<div class="notice mt8 tc b">🔥 ${mult}x Star Power</div>` : ''}<div class="split-list">${sorted.length ? sorted.slice(0, 12).map((s, i) => standingRow(s, i + 1, leader)).join('') : '<p class="tiny tc mt16">No students yet.</p>'}</div>`;
+}
+function updateSplitBoard() { const b = $('split-board'); if (b) { const sc = b.scrollTop; b.innerHTML = splitBoardHTML(); b.scrollTop = sc; } }
+function cycleSplit() { slidesCfg.split = ((slidesCfg.split || 2) % 3) + 1; saveSlidesCfg(); const pr = document.querySelector('.proj.split'); if (pr) pr.style.setProperty('--bw', SPLIT_W[slidesCfg.split]); }
 function openProjector(mode) {
   loadSlidesCfg();
-  ui.projector = { mode:(mode === 'qr' && ui.teacher) ? 'qr' : (mode === 'slides' ? 'slides' : 'board') };
+  ui.projector = { mode:(mode === 'qr' && ui.teacher) ? 'qr' : (mode === 'slides' || mode === 'split' ? mode : 'board') };
   $('projector').classList.remove('hide'); renderProjector(true);
   try { const el = document.documentElement; if (el.requestFullscreen && !document.fullscreenElement) el.requestFullscreen().catch(() => {}); } catch (e) {}
 }
@@ -872,22 +889,25 @@ function setProjectorMode(m) { if (ui.projector) { ui.projector.mode = m; render
 function projBar(mode) {
   const tab = (m, label) => `<button class="btn sm ${mode === m ? 'purple' : 'slate'}" onclick="setProjectorMode('${m}')">${label}</button>`;
   let right = '';
-  if (mode === 'slides') {
+  if (mode === 'slides' || mode === 'split') {
     const has = !!slidesSrc(), pub = (parseSlides(slidesCfg.url) || {}).pub;
+    if (mode === 'split') right += `<button class="btn sm slate" onclick="cycleSplit()">Board size</button>`;
     right += `<button class="btn sm slate" onclick="openSlidesForm()"><span data-ic="sliders"></span>Slide link</button>`;
     if (has) right += (pub ? '' : `<button class="btn sm slate" onclick="toggleAltViewer()">${slidesCfg.alt ? 'Slideshow viewer' : 'Alt viewer'}</button>`) + `<button class="btn sm slate" onclick="reloadSlides()"><span data-ic="rotate"></span>Reload</button>`;
   }
-  return `<div class="proj-bar"><div class="flex gap8 fw">${tab('board', 'Leaderboard')}${ui.teacher ? tab('qr', 'Scan Code') : ''}${tab('slides', 'Slides')}</div><div class="flex gap8 fw">${right}<button class="btn sm red" onclick="closeProjector()"><span data-ic="x"></span>Exit (Esc)</button></div></div>`;
+  return `<div class="proj-bar"><div class="flex gap8 fw">${tab('board', 'Leaderboard')}${ui.teacher ? tab('qr', 'Scan Code') : ''}${tab('slides', 'Slides')}${tab('split', 'Split view')}</div><div class="flex gap8 fw">${right}<button class="btn sm red" onclick="closeProjector()"><span data-ic="x"></span>Exit (Esc)</button></div></div>`;
 }
 function renderProjector(force) {
   const p = $('projector'); if (!ui.projector) return;
   const mode = ui.projector.mode;
-  if (mode === 'slides' && p.dataset.mode === 'slides' && !force) return;   // never reload the slide because a score changed
-  p.dataset.mode = mode; p.classList.toggle('slides', mode === 'slides');
+  if ((mode === 'slides' || mode === 'split') && p.dataset.mode === mode && !force) return;   // never reload the slide because a score changed
+  p.dataset.mode = mode; p.classList.toggle('slides', mode === 'slides' || mode === 'split');
   const bar = projBar(mode);
-  if (mode === 'slides') {
+  if (mode === 'slides' || mode === 'split') {
     const src = slidesSrc();
-    p.innerHTML = `<div class="proj slides-mode">${bar}<div class="slides-stage" id="slides-stage">${src ? `<iframe id="slides-frame" src="${esc(src)}" title="Google Slides" allow="fullscreen; autoplay" allowfullscreen></iframe>` : `<div class="slides-overlay">${slidesFormHTML(false)}</div>`}</div></div>`;
+    const stage = `<div class="slides-stage" id="slides-stage">${src ? `<iframe id="slides-frame" src="${esc(src)}" title="Google Slides" allow="fullscreen; autoplay" allowfullscreen></iframe>` : `<div class="slides-overlay">${slidesFormHTML(false)}</div>`}</div>`;
+    if (mode === 'split') p.innerHTML = `<div class="proj slides-mode split" style="--bw:${SPLIT_W[slidesCfg.split] || SPLIT_W[2]}">${bar}<div class="split-wrap">${stage}<aside class="split-board" id="split-board">${splitBoardHTML()}</aside></div></div>`;
+    else p.innerHTML = `<div class="proj slides-mode">${bar}${stage}</div>`;
     if (!src) setTimeout(() => { const i = $('slides-url'); if (i) i.focus(); }, 30);
   } else if (mode === 'qr') {
     const mult = state.settings.multiplier || 1;
@@ -1004,7 +1024,7 @@ function renderTeacherDashboardView() {
   const mult = state.settings.multiplier || 1, tab = ui.tab || 'roster', pend = state.redemptions.filter(x => !x.done).length;
   const cdot = Cloud.configured ? (Cloud.on ? '' : 'bad') : 'warn';
   const body = tab === 'prizes' ? prizesTabHTML() : tab === 'setup' ? `<div id="save-center">${saveCenterHTML()}</div>` : rosterTabHTML();
-  return `<div class="stack"><div class="flex jb ac fw gap16"><div><span class="chip">TEACHER HUB • ${esc(Cloud.room)}</span><h2 class="hero-title disp neon mt8" style="font-size:36px">Command Center</h2><p class="tiny mt8">Students: <b style="color:#fff" id="roster-count">${state.students.length}</b> • Claims Waiting: <b class="gold" id="claims-pending">${pend}</b></p></div><div class="flex fw gap8"><button class="btn goldb sm" onclick="openPicker()"><span data-ic="dice"></span>Random Picker</button><button class="btn slate sm" onclick="openProjector('board')"><span data-ic="cast"></span>Projector</button><button class="btn slate sm" onclick="openProjector('slides')"><span data-ic="slides"></span>Slides</button><button class="btn slate sm" onclick="openSettings()"><span data-ic="sliders"></span>Settings</button><button class="btn slate sm" onclick="lockTeacher()"><span data-ic="lock"></span>Lock</button></div></div>${Cloud.configured&&!Cloud.on?connNotice():''}<div class="card gold-b"><div class="flex ac gap24 fw jc"><div class="qrbox"><div id="teacher-active-qr-canvas"></div></div><div class="f1" style="min-width:250px"><span class="chip gold">STAR DISPENSER</span><div class="mono b gold mt8" style="font-size:34px;letter-spacing:.2em" id="teacher-token-label">${esc(state.currentQrToken)}</div><p class="tiny mt4">Each scan gives <b class="gold">+${mult} star${mult > 1 ? 's' : ''}</b>, then changes.</p><div class="flex fw gap8 mt12 ac"><button class="btn goldb" onclick="openProjector('qr')"><span data-ic="cast"></span>Project Full Screen</button><button class="btn slate sm" onclick="manualRegenerateQr()"><span data-ic="rotate"></span>New Code</button></div><div class="flex fw gap8 mt12 ac"><span class="tiny b">Star Power:</span>${[1, 2, 3].map(n => `<button class="btn sm ${mult===n?'goldb':'slate'}" onclick="setMultiplier(${n})">${n}x</button>`).join('')}</div></div></div></div><div><div class="tabs"><button class="tab ${tab === 'roster' ? 'active' : ''}" onclick="setTab('roster')"><span data-ic="users"></span>Roster</button><button class="tab ${tab === 'prizes' ? 'active' : ''}" onclick="setTab('prizes')"><span data-ic="gift"></span>Prize Store ${pend ? '<span class="chip gold">' + pend + '</span>' : ''}</button><button class="tab ${tab === 'setup' ? 'active' : ''}" onclick="setTab('setup')"><i class="dot ${cdot}"></i>Database Engine</button></div><div class="mt16">${body}</div></div></div>`;
+  return `<div class="stack"><div class="flex jb ac fw gap16"><div><span class="chip">TEACHER HUB • ${esc(Cloud.room)}</span><h2 class="hero-title disp neon mt8" style="font-size:36px">Command Center</h2><p class="tiny mt8">Students: <b style="color:#fff" id="roster-count">${state.students.length}</b> • Claims Waiting: <b class="gold" id="claims-pending">${pend}</b></p></div><div class="flex fw gap8"><button class="btn goldb sm" onclick="openPicker()"><span data-ic="dice"></span>Random Picker</button><button class="btn slate sm" onclick="openProjector('board')"><span data-ic="cast"></span>Projector</button><button class="btn slate sm" onclick="openProjector('slides')"><span data-ic="slides"></span>Slides</button><button class="btn slate sm" onclick="openProjector('split')"><span data-ic="cast"></span>Split</button><button class="btn slate sm" onclick="openSettings()"><span data-ic="sliders"></span>Settings</button><button class="btn slate sm" onclick="lockTeacher()"><span data-ic="lock"></span>Lock</button></div></div>${Cloud.configured&&!Cloud.on?connNotice():''}<div class="card gold-b"><div class="flex ac gap24 fw jc"><div class="qrbox"><div id="teacher-active-qr-canvas"></div></div><div class="f1" style="min-width:250px"><span class="chip gold">STAR DISPENSER</span><div class="mono b gold mt8" style="font-size:34px;letter-spacing:.2em" id="teacher-token-label">${esc(state.currentQrToken)}</div><p class="tiny mt4">Each scan gives <b class="gold">+${mult} star${mult > 1 ? 's' : ''}</b>, then changes.</p><div class="flex fw gap8 mt12 ac"><button class="btn goldb" onclick="openProjector('qr')"><span data-ic="cast"></span>Project Full Screen</button><button class="btn slate sm" onclick="manualRegenerateQr()"><span data-ic="rotate"></span>New Code</button></div><div class="flex fw gap8 mt12 ac"><span class="tiny b">Star Power:</span>${[1, 2, 3].map(n => `<button class="btn sm ${mult===n?'goldb':'slate'}" onclick="setMultiplier(${n})">${n}x</button>`).join('')}</div></div></div></div><div><div class="tabs"><button class="tab ${tab === 'roster' ? 'active' : ''}" onclick="setTab('roster')"><span data-ic="users"></span>Roster</button><button class="tab ${tab === 'prizes' ? 'active' : ''}" onclick="setTab('prizes')"><span data-ic="gift"></span>Prize Store ${pend ? '<span class="chip gold">' + pend + '</span>' : ''}</button><button class="tab ${tab === 'setup' ? 'active' : ''}" onclick="setTab('setup')"><i class="dot ${cdot}"></i>Database Engine</button></div><div class="mt16">${body}</div></div></div>`;
 }
 function renderTeacherQrCanvas() { drawQR($('teacher-active-qr-canvas'), state.currentQrToken, 170); }
 async function manualRegenerateQr() {
