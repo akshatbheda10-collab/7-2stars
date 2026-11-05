@@ -14,7 +14,7 @@
 <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
 <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
   const SUPABASE_URL = "https://wtqqyadgolqbtoqizfvd.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_TnD-uSOe2lD40FXzP52OKQ_7hjfaC0v";
@@ -309,6 +309,31 @@ label.lbl { display:block; font-size: 12px; font-weight:800; color:#d4d0f5; marg
 .split-board .av { font-size:22px; width:30px; } .split-board .sname { font-size:14px; }
 @media (max-width:760px) { .split-wrap { flex-direction:column; } .split-board { width:auto; max-height:42%; border-left:0; border-top:1px solid rgba(255,255,255,.1); padding-top:12px; } }
 
+/* print */
+#print-sheet { display:none; }
+@media print {
+  html, body { background:#fff !important; color:#000 !important; overflow:visible !important; height:auto !important; }
+  body > *:not(#print-sheet) { display:none !important; }
+  #print-sheet { display:block !important; }
+  @page { margin:.4in; }
+}
+.pc-preview .pcard { width:100%; height:2.02in; }
+
+/* ===== v6 polish ===== */
+.card { box-shadow:0 1px 0 rgba(255,255,255,.07) inset, 0 14px 34px rgba(0,0,0,.38); }
+.ctitle { letter-spacing:-.01em; }
+.hero-title { text-wrap:balance; }
+.tabs { gap:2px; }
+.tab { border-radius:12px 12px 0 0; padding:12px 18px; }
+.tab.active { background:rgba(167,139,250,.12); }
+.srow.first { background:linear-gradient(90deg, rgba(251,191,36,.13), rgba(7,5,20,.5) 60%); }
+.field { transition:border-color .15s, box-shadow .15s; }
+.btn.goldb { box-shadow:0 4px 0 #b45309, 0 8px 18px rgba(251,191,36,.22); }
+.box { background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(7,5,20,.6)); }
+.prize-ic { background:linear-gradient(135deg, rgba(255,255,255,.12), rgba(255,255,255,.03)); }
+.cd-panel { box-shadow:0 14px 40px rgba(0,0,0,.4); }
+.srow, .feed { contain:layout style; }
+
 /* countdown panel */
 .cd-panel { backdrop-filter:none; -webkit-backdrop-filter:none; background:linear-gradient(180deg, var(--acs), rgba(20,16,50,.92) 55%); }
 .cd-head .t, .cd-tag { white-space:nowrap; }
@@ -371,12 +396,13 @@ label.lbl { display:block; font-size: 12px; font-weight:800; color:#d4d0f5; marg
 <aside id="side"></aside>
 </div>
 <div id="projector" class="hide"></div>
+<div id="print-sheet" aria-hidden="true"></div>
 <div id="toast-container"></div>
 <div id="modal" onclick="if(event.target===this)closeModal()"><div id="modal-content" class="card"></div></div>
 <input type="file" id="json-import-input" accept=".json, application/json" class="hide" onchange="handleImportFile(event)">
 <script>
 /* ===== SITE GATE SETTINGS ===== */
-const CORE_PASSWORDS = { '1':'9292', '2':'1412', '3':'4314', '4':'9877' };   // <-- one password per core (change them here)
+const CORE_PASSWORDS = { '1':'9292', '2':'1412', '3':'4314', '4':'6767' };   // <-- one password per core (change them here)
 
 /* ===== LAZY LIBRARIES (loaded only when needed so the page paints fast) ===== */
 const LIBS = {
@@ -413,6 +439,7 @@ document.addEventListener('click', e => {
 }, true);
 
 const IC = {
+print:'<path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>',
 slides:'<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M10 8.5l4 2-4 2z"/>',
 chev:'<path d="M6 9l6 6 6-6"/>',
 trophy:'<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
@@ -494,6 +521,7 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&am
 const clock = t => new Date(t).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' });
 const SAFE = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function newCode() { let p=''; for (let i=0; i<6; i++) p += SAFE[Math.floor(Math.random()*SAFE.length)]; return p; }
+function uniqueName(st, name) { let nm = name, k = 2; const has = n => st.students.some(x => x.name.toLowerCase() === n.toLowerCase()); while (has(nm)) nm = name + ' ' + k++; return nm; }
 function pinFor(st) { const used = new Set(st.students.map(s => s.pin)); let p; do { p = newCode(); } while (used.has(p)); return p; }
 function addLog(st, icon, msg) { st.activity.unshift({ t:Date.now(), icon, msg }); st.activity = st.activity.slice(0, 30); }
 function levelInfo(total) {
@@ -742,7 +770,7 @@ async function connectCloud() {
     const wasOn = Cloud.on; Cloud.loaded = true;
     Cloud.on = !err; Cloud.exists = exists; Cloud.error = err || null;
     let changed = false;
-    if (exists && data && data.savedAt !== state.savedAt) { applyData(data); Store.save(getPayload()); lastSaveTime = Date.now(); scheduleFileWrite(); changed = true; }
+    if (exists && data && data.savedAt !== state.savedAt && pendingOpt === 0) { applyData(data); Store.save(getPayload()); lastSaveTime = Date.now(); scheduleFileWrite(); changed = true; }
     updateSaveBadge(); refreshSaveCenter();
     if (Cloud.on && !exists && ui.teacher && !Cloud.pub) { Cloud.pub = true; publishToCloud(); }
     if (changed || wasOn !== Cloud.on) softRerender();
@@ -997,7 +1025,7 @@ function claimsHTML() {
   return list.map(r => `<div class="srow" style="${r.done?'':'border-color:rgba(251,191,36,.5)'}"><div class="f1"><div class="sname" style="font-size:13.5px">${esc(r.icon)} ${esc(r.title)}</div><div class="tiny">${esc(r.name)} • ${clock(r.t)}</div></div><button class="btn ${r.done?'slate':'green'} sm" onclick="toggleClaim('${esc(r.id)}')">${r.done ? 'Undo' : 'Mark Given'}</button></div>`).join('');
 }
 function rosterTabHTML() {
-  return `<div class="card"><div class="flex jb ac fw gap8"><h3 class="ctitle disp">Roster &amp; PINs</h3><div class="flex fw gap8"><input class="field" id="roster-search" style="width: 160px;padding:8px 11px" placeholder="Search..." oninput="filterRoster(this.value)"><button class="btn slate sm" onclick="promptSingleStudent()"><span data-ic="plus"></span>Add One</button><button class="btn purple sm" onclick="openBulkStudentModal()"><span data-ic="users"></span>Bulk Add</button><button class="btn blue sm" onclick="openPinList()"><span data-ic="list"></span>PIN List</button></div></div><div id="roster-list" class="scroll mt16" style="max-height:520px; display:grid; gap:8px">${rosterHTML()}</div></div>`;
+  return `<div class="card"><div class="flex jb ac fw gap8"><h3 class="ctitle disp">Roster &amp; PINs</h3><div class="flex fw gap8"><input class="field" id="roster-search" style="width: 160px;padding:8px 11px" placeholder="Search..." oninput="filterRoster(this.value)"><button class="btn slate sm" onclick="promptSingleStudent()"><span data-ic="plus"></span>Add One</button><button class="btn purple sm" onclick="openBulkStudentModal()"><span data-ic="users"></span>Bulk Add</button><button class="btn blue sm" onclick="openPinList()"><span data-ic="list"></span>PIN List</button><button class="btn goldb sm" onclick="openPrintCards()"><span data-ic="print"></span>Print Cards</button></div></div><div id="roster-list" class="scroll mt16" style="max-height:520px; display:grid; gap:8px">${rosterHTML()}</div></div>`;
 }
 function prizesTabHTML() {
   return `<div class="cols-2" style="grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); align-items:start"><div class="card"><div class="flex jb ac"><h3 class="ctitle disp">Prize Store</h3><button class="btn pink sm" onclick="openAddPrizeModal()"><span data-ic="plus"></span>Add Prize</button></div><div id="prize-list" class="scroll mt16" style="max-height:480px; display:grid; gap:8px">${prizesHTML()}</div></div><div class="card"><h3 class="ctitle disp">Prize Claims</h3><div id="claims-list" class="scroll mt16" style="max-height:480px;display:grid;gap:8px">${claimsHTML()}</div></div></div>`;
@@ -1024,7 +1052,7 @@ function renderTeacherDashboardView() {
   const mult = state.settings.multiplier || 1, tab = ui.tab || 'roster', pend = state.redemptions.filter(x => !x.done).length;
   const cdot = Cloud.configured ? (Cloud.on ? '' : 'bad') : 'warn';
   const body = tab === 'prizes' ? prizesTabHTML() : tab === 'setup' ? `<div id="save-center">${saveCenterHTML()}</div>` : rosterTabHTML();
-  return `<div class="stack"><div class="flex jb ac fw gap16"><div><span class="chip">TEACHER HUB • ${esc(Cloud.room)}</span><h2 class="hero-title disp neon mt8" style="font-size:36px">Command Center</h2><p class="tiny mt8">Students: <b style="color:#fff" id="roster-count">${state.students.length}</b> • Claims Waiting: <b class="gold" id="claims-pending">${pend}</b></p></div><div class="flex fw gap8"><button class="btn goldb sm" onclick="openPicker()"><span data-ic="dice"></span>Random Picker</button><button class="btn slate sm" onclick="openProjector('board')"><span data-ic="cast"></span>Projector</button><button class="btn slate sm" onclick="openProjector('slides')"><span data-ic="slides"></span>Slides</button><button class="btn slate sm" onclick="openProjector('split')"><span data-ic="cast"></span>Split</button><button class="btn slate sm" onclick="openSettings()"><span data-ic="sliders"></span>Settings</button><button class="btn slate sm" onclick="lockTeacher()"><span data-ic="lock"></span>Lock</button></div></div>${Cloud.configured&&!Cloud.on?connNotice():''}<div class="card gold-b"><div class="flex ac gap24 fw jc"><div class="qrbox"><div id="teacher-active-qr-canvas"></div></div><div class="f1" style="min-width:250px"><span class="chip gold">STAR DISPENSER</span><div class="mono b gold mt8" style="font-size:34px;letter-spacing:.2em" id="teacher-token-label">${esc(state.currentQrToken)}</div><p class="tiny mt4">Each scan gives <b class="gold">+${mult} star${mult > 1 ? 's' : ''}</b>, then changes.</p><div class="flex fw gap8 mt12 ac"><button class="btn goldb" onclick="openProjector('qr')"><span data-ic="cast"></span>Project Full Screen</button><button class="btn slate sm" onclick="manualRegenerateQr()"><span data-ic="rotate"></span>New Code</button></div><div class="flex fw gap8 mt12 ac"><span class="tiny b">Star Power:</span>${[1, 2, 3].map(n => `<button class="btn sm ${mult===n?'goldb':'slate'}" onclick="setMultiplier(${n})">${n}x</button>`).join('')}</div></div></div></div><div><div class="tabs"><button class="tab ${tab === 'roster' ? 'active' : ''}" onclick="setTab('roster')"><span data-ic="users"></span>Roster</button><button class="tab ${tab === 'prizes' ? 'active' : ''}" onclick="setTab('prizes')"><span data-ic="gift"></span>Prize Store ${pend ? '<span class="chip gold">' + pend + '</span>' : ''}</button><button class="tab ${tab === 'setup' ? 'active' : ''}" onclick="setTab('setup')"><i class="dot ${cdot}"></i>Database Engine</button></div><div class="mt16">${body}</div></div></div>`;
+  return `<div class="stack"><div class="flex jb ac fw gap16"><div><span class="chip">TEACHER HUB • ${esc(Cloud.room)}</span><h2 class="hero-title disp neon mt8" style="font-size:36px">Command Center</h2><p class="tiny mt8">Students: <b style="color:#fff" id="roster-count">${state.students.length}</b> • Claims Waiting: <b class="gold" id="claims-pending">${pend}</b></p></div><div class="flex fw gap8"><button class="btn goldb sm" onclick="openPicker()"><span data-ic="dice"></span>Random Picker</button><button class="btn goldb sm" onclick="openPrintCards()"><span data-ic="print"></span>Print Cards</button><button class="btn slate sm" onclick="openProjector('board')"><span data-ic="cast"></span>Projector</button><button class="btn slate sm" onclick="openProjector('slides')"><span data-ic="slides"></span>Slides</button><button class="btn slate sm" onclick="openProjector('split')"><span data-ic="cast"></span>Split</button><button class="btn slate sm" onclick="openSettings()"><span data-ic="sliders"></span>Settings</button><button class="btn slate sm" onclick="lockTeacher()"><span data-ic="lock"></span>Lock</button></div></div>${Cloud.configured&&!Cloud.on?connNotice():''}<div class="card gold-b"><div class="flex ac gap24 fw jc"><div class="qrbox"><div id="teacher-active-qr-canvas"></div></div><div class="f1" style="min-width:250px"><span class="chip gold">STAR DISPENSER</span><div class="mono b gold mt8" style="font-size:34px;letter-spacing:.2em" id="teacher-token-label">${esc(state.currentQrToken)}</div><p class="tiny mt4">Each scan gives <b class="gold">+${mult} star${mult > 1 ? 's' : ''}</b>, then changes.</p><div class="flex fw gap8 mt12 ac"><button class="btn goldb" onclick="openProjector('qr')"><span data-ic="cast"></span>Project Full Screen</button><button class="btn slate sm" onclick="manualRegenerateQr()"><span data-ic="rotate"></span>New Code</button></div><div class="flex fw gap8 mt12 ac"><span class="tiny b">Star Power:</span>${[1, 2, 3].map(n => `<button class="btn sm ${mult===n?'goldb':'slate'}" onclick="setMultiplier(${n})">${n}x</button>`).join('')}</div></div></div></div><div><div class="tabs"><button class="tab ${tab === 'roster' ? 'active' : ''}" onclick="setTab('roster')"><span data-ic="users"></span>Roster</button><button class="tab ${tab === 'prizes' ? 'active' : ''}" onclick="setTab('prizes')"><span data-ic="gift"></span>Prize Store ${pend ? '<span class="chip gold">' + pend + '</span>' : ''}</button><button class="tab ${tab === 'setup' ? 'active' : ''}" onclick="setTab('setup')"><i class="dot ${cdot}"></i>Database Engine</button></div><div class="mt16">${body}</div></div></div>`;
 }
 function renderTeacherQrCanvas() { drawQR($('teacher-active-qr-canvas'), state.currentQrToken, 170); }
 async function manualRegenerateQr() {
@@ -1102,15 +1130,35 @@ async function claimPrize(id) {
   sfx('star'); celebrate(); bg.boost = .8; showToast('Claimed ' + res.title + '! Show your teacher.', 'success'); renderView('student-shop');
 }
 async function toggleClaim(id) { await mutate(st => { const r = st.redemptions.find(x => x.id === id); if (r) r.done = !r.done; return { ok:true }; }); refreshTeacherLists(); }
+function adjustIn(st, id, amt) {
+  const s = st.students.find(x => x.id === id); if (!s) return { error:'no-student' };
+  const before = levelInfo(s.totalEarned).i;
+  if (amt > 0) { s.stars += amt; s.totalEarned += amt; } else { s.stars = Math.max(0, s.stars + amt); s.totalEarned = Math.max(0, s.totalEarned + amt); }
+  if (amt > 0) { addLog(st, '⭐', s.name + ' earned +' + amt + ' from teacher'); const a = levelInfo(s.totalEarned); if (a.i > before) addLog(st, '🎉', s.name + ' reached ' + a.cur.name + '!'); }
+  return { ok:true };
+}
+let pendingOpt = 0, optQ = Promise.resolve();
+async function resyncFromCloud() { try { const r = await window.CloudMutate(() => ({ ok:true })); if (r && r.st) { applyData(r.st); softRerender(); } } catch (e) {} }
+function optimisticMutate(fn) {
+  pendingOpt++;
+  const run = async () => {
+    let res;
+    try { res = await window.CloudMutate(fn); } catch (e) { res = { result:{ error:'cloud-fail' } }; }
+    pendingOpt--;
+    if (res.result && res.result.error) { showToast(explainError(res.result), 'error'); resyncFromCloud(); return res.result; }
+    if (res.st && pendingOpt === 0) { applyData(res.st); Store.save(getPayload()); lastSaveTime = Date.now(); scheduleFileWrite(); updateSaveBadge(); softRerender(); }
+    return res.result || { ok:true };
+  };
+  optQ = optQ.then(run, run);
+  return optQ;
+}
 async function teacherAdjustStars(id, amt) {
-  await mutate(st => {
-    const s = st.students.find(x => x.id === id); if (!s) return { error:'no-student' };
-    const before = levelInfo(s.totalEarned).i;
-    if (amt > 0) { s.stars += amt; s.totalEarned += amt; } else { s.stars = Math.max(0, s.stars + amt); s.totalEarned = Math.max(0, s.totalEarned + amt); }
-    if (amt > 0) { addLog(st, '⭐', s.name + ' earned +' + amt + ' from teacher'); const a = levelInfo(s.totalEarned); if (a.i > before) addLog(st, '🎉', s.name + ' reached ' + a.cur.name + '!'); }
-    return { ok:true };
-  });
-  if (amt > 0) bg.boost = .6; sfx(amt > 0 ? 'star' : 'pop'); refreshTeacherLists();
+  if (amt > 0) bg.boost = .6; sfx(amt > 0 ? 'star' : 'pop');
+  if (Cloud.on) {   // update the screen instantly, sync to the database in the background
+    adjustIn(state, id, amt); Store.save(getPayload()); refreshTeacherLists(); if (ui.projector) softRerender();
+    await optimisticMutate(st => adjustIn(st, id, amt)); return;
+  }
+  await mutate(st => adjustIn(st, id, amt)); refreshTeacherLists();
 }
 async function resetPin(id) {
   const res = await mutate(st => { const s = st.students.find(x => x.id === id); if (!s) return { error:'no-student' }; s.pin = pinFor(st); return { ok:true, name:s.name, pin:s.pin }; });
@@ -1137,12 +1185,14 @@ function runConfirm() { const f = pendingConfirm; pendingConfirm = null; closeMo
 function openBulkStudentModal() {
   openModal(`${modalHead('Bulk Add Roster')}<p class="tiny mt12">Paste student names below (one per line or separated by commas):</p><textarea class="field mono mt12" id="bulk-students-input" rows="8" placeholder="Alex S&#10;Jordan L&#10;Taylor R"></textarea><button class="btn purple lg block mt12" onclick="processBulkStudents()">Import Roster</button>`);
 }
-async function processBulkStudents() {
+let bulkBusy = false;
+async function processBulkStudents() { if (bulkBusy) return; bulkBusy = true; try { await processBulkStudentsInner(); } finally { bulkBusy = false; } }
+async function processBulkStudentsInner() {
   const t = $('bulk-students-input'); if (!t) return;
   const names = t.value.split(/[\n,]+/).map(n => n.trim().slice(0, 40)).filter(Boolean);
   if (!names.length) { showToast('Enter at least one name', 'error'); return; }
   const res = await mutate(st => {
-    names.forEach(name => st.students.push({ id:'stu-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), name, pin:pinFor(st), stars:0, totalEarned:0, avatar:AVATARS[Math.floor(Math.random() * AVATARS.length)] }));
+    names.forEach(name => st.students.push({ id:'stu-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), name:uniqueName(st, name), pin:pinFor(st), stars:0, totalEarned:0, avatar:AVATARS[Math.floor(Math.random() * AVATARS.length)] }));
     addLog(st, '👥', names.length + ' new students joined!'); return { ok:true };
   });
   if (res.error) { showToast(explainError(res), 'error'); return; }
@@ -1155,7 +1205,7 @@ function promptSingleStudent() {
 async function saveSingleStudent(e) {
   e.preventDefault(); const i = $('single-student-name-input'); if (!i || !i.value.trim()) return;
   const name = i.value.trim().slice(0, 40);
-  const res = await mutate(st => { st.students.push({ id:'stu-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), name, pin:pinFor(st), stars:0, totalEarned:0, avatar:AVATARS[Math.floor(Math.random() * AVATARS.length)] }); return { ok:true }; });
+  const res = await mutate(st => { st.students.push({ id:'stu-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), name:uniqueName(st, name), pin:pinFor(st), stars:0, totalEarned:0, avatar:AVATARS[Math.floor(Math.random() * AVATARS.length)] }); return { ok:true }; });
   if (res.error) { showToast(explainError(res), 'error'); return; }
   closeModal(); refreshTeacherLists(); showToast('Added ' + name + '!', 'success');
 }
@@ -1188,6 +1238,55 @@ function spinPicker() {
     if (!last) { delay *= 1.13; setTimeout(tick, delay); }
     else { celebrate(); sfx('star'); bg.boost = 1; btn.disabled = false; btn.textContent = 'SPIN AGAIN'; }
   })();
+}
+/* ===== Printable PIN cards ===== */
+const PCARD_CSS = `
+.pcards{display:block}
+.pp{display:grid;grid-template-columns:repeat(2,1fr);grid-auto-rows:2.02in;width:100%;page-break-after:always;break-after:page}
+.pp:last-child{page-break-after:auto;break-after:auto}
+.pcard{box-sizing:border-box;border:1.5px dashed #777;padding:.15in .2in;display:flex;flex-direction:column;justify-content:space-between;background:#fff;color:#111;font-family:Inter,system-ui,Arial,sans-serif;overflow:hidden;break-inside:avoid}
+.pc-top{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.pc-core{border:1.5px solid #111;border-radius:99px;padding:2px 10px}
+.pc-lbl{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#555}
+.pc-name{font-size:22px;font-weight:800;line-height:1.1;word-break:break-word}
+.pc-row{display:flex;gap:18px;align-items:flex-end}
+.pc-pin{font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;font-weight:700;font-size:28px;letter-spacing:.14em;line-height:1.1}
+.pc-code{font-size:22px}
+.pc-how{font-size:9.5px;color:#444;line-height:1.4;border-top:1px dashed #bbb;padding-top:5px}
+`;
+(function () { const st = document.createElement('style'); st.id = 'pcard-css'; st.textContent = PCARD_CSS; document.head.appendChild(st); })();
+const pcfg = { site:'', code:true };
+const coreNum = () => String(window.CORE_ID || '').slice(-1);
+function printWebsite() { return /^https?:/.test(location.href) ? location.origin + location.pathname.replace(/index\.html$/, '') : ''; }
+function cardHTML(s) {
+  const n = coreNum(), code = CORE_PASSWORDS[n] || '';
+  return `<div class="pcard"><div class="pc-top"><span>⭐ Star Champions</span><span class="pc-core">Core ${esc(n)}</span></div><div><div class="pc-lbl">Student</div><div class="pc-name">${esc(s.name)}</div></div><div class="pc-row"><div><div class="pc-lbl">My PIN</div><div class="pc-pin">${esc(s.pin)}</div></div>${pcfg.code ? `<div><div class="pc-lbl">Core ${esc(n)} code</div><div class="pc-pin pc-code">${esc(code)}</div></div>` : ''}</div><div class="pc-how">${pcfg.site ? '<b>' + esc(pcfg.site) + '</b><br>' : ''}1) Pick <b>Core ${esc(n)}</b>${pcfg.code ? ' and enter the core code' : ''} &nbsp; 2) Tap <b>Student</b> &nbsp; 3) Type your name and PIN</div></div>`;
+}
+function sheetHTML() {
+  const list = [...state.students].sort((a, b) => a.name.localeCompare(b.name)), pages = [];
+  for (let i = 0; i < list.length; i += 10) pages.push(list.slice(i, i + 10));
+  return `<div class="pcards">${pages.map(pg => `<section class="pp">${pg.map(cardHTML).join('')}</section>`).join('')}</div>`;
+}
+function refreshPcPreview() { const el = $('pc-preview'); if (el) el.innerHTML = '<div class="pp" style="display:block;page-break-after:auto">' + cardHTML(state.students[0]) + '</div>'; }
+function setPcSite(v) { pcfg.site = v.trim(); refreshPcPreview(); }
+function setPcCode(on) { pcfg.code = !!on; refreshPcPreview(); }
+function openPrintCards() {
+  if (!state.students.length) { showToast('Add students first', 'error'); return; }
+  if (!pcfg.site) pcfg.site = printWebsite();
+  const pages = Math.ceil(state.students.length / 10), n = coreNum();
+  openModal(`${modalHead('Print PIN Cards')}<p class="tiny mt12">${state.students.length} cards • ${pages} page${pages > 1 ? 's' : ''} • 10 per page. Print, then cut along the dashed lines.</p><div class="mt12"><label class="lbl">Website address shown on cards (optional)</label><input class="field" id="pc-site" value="${esc(pcfg.site)}" placeholder="https://your-site.com" oninput="setPcSite(this.value)"></div><label class="tiny flex ac gap8 mt12" style="cursor:pointer"><input type="checkbox" id="pc-code" ${pcfg.code ? 'checked' : ''} onchange="setPcCode(this.checked)"> Include the Core ${esc(n)} entry code on each card</label><div class="tiny mt16 b">Preview</div><div class="pc-preview mt8" id="pc-preview"></div><div class="flex fw gap8 mt16"><button class="btn goldb" onclick="printCards()"><span data-ic="print"></span>Print</button><button class="btn slate" onclick="downloadCards()"><span data-ic="download"></span>Save printable file</button></div><p class="tiny mt12">If Print does nothing in your browser, use “Save printable file”, open it, and press Ctrl+P.</p>`);
+  refreshPcPreview();
+}
+function printCards() {
+  $('print-sheet').innerHTML = sheetHTML(); closeModal();
+  window.onafterprint = () => { $('print-sheet').innerHTML = ''; };
+  setTimeout(() => { try { window.print(); } catch (e) { showToast('Printing is blocked here. Use “Save printable file”.', 'info'); } }, 150);
+}
+function downloadCards() {
+  const n = coreNum();
+  const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Star Champions - Core ' + n + ' PIN cards</title><style>body{margin:0}@page{margin:.4in}' + PCARD_CSS + '</style></head><body>' + sheetHTML() + '<scr' + 'ipt>window.onload=function(){setTimeout(function(){window.print()},400)}</scr' + 'ipt></body></html>';
+  try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([html], { type:'text/html' })); a.download = 'StarChampions-Core' + n + '-PIN-cards.html'; document.body.appendChild(a); a.click(); a.remove(); showToast('Saved. Open the file and print it.', 'success'); }
+  catch (e) { showToast('Could not save the file here.', 'error'); }
 }
 function openPinList() {
   const text = [...state.students].sort((a, b) => a.name.localeCompare(b.name)).map(s => s.name + ' - ' + s.pin).join('\n');
