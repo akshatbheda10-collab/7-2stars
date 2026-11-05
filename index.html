@@ -7,12 +7,13 @@
 <meta name="robots" content="noindex">
 <title>Star Champions - Class Rewards League</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⭐</text></svg>">
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script>if (typeof Html5QrcodeScanner === 'undefined') document.write('<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"><\/script>');</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<meta name="description" content="Star Champions - class rewards league with a live Track 2 countdown.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://wtqqyadgolqbtoqizfvd.supabase.co" crossorigin>
+<link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+<link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
   const SUPABASE_URL = "https://wtqqyadgolqbtoqizfvd.supabase.co";
@@ -243,6 +244,73 @@ label.lbl { display:block; font-size: 12px; font-weight:800; color:#d4d0f5; marg
 .cd-r { flex:none; text-align:right; font-weight:800; font-size:12px; font-variant-numeric:tabular-nums; }
 .cd-r small { display:block; font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); }
 .cd-foot { margin-top:12px; font-size:10.5px; color:var(--dim); line-height:1.5; }
+
+/* ===== v5 polish & speed ===== */
+.card { background:rgba(20,16,50,.9); backdrop-filter:none; -webkit-backdrop-filter:none; }
+.card.gold-b { background:linear-gradient(180deg, rgba(251,191,36,.08), rgba(20,16,50,.92) 60%); }
+:focus-visible { outline:2px solid #fbbf24; outline-offset:2px; border-radius:8px; }
+.field:focus-visible { outline:none; }
+.topbar { background:rgba(10,7,30,.85); }
+.nav-btn { min-height:38px; }
+.nav-btn.status[data-core="1"] { color:#bae6fd; border-color:rgba(56,189,248,.55); background:rgba(56,189,248,.1); }
+.nav-btn.status[data-core="2"] { color:#a7f3d0; border-color:rgba(52,211,153,.55); background:rgba(52,211,153,.1); }
+.nav-btn.status[data-core="3"] { color:#fde68a; border-color:rgba(251,191,36,.55); background:rgba(251,191,36,.1); }
+.nav-btn.status[data-core="4"] { color:#fecdd3; border-color:rgba(251,113,133,.55); background:rgba(251,113,133,.1); }
+.srow { transition:background .15s, transform .15s; }
+.srow:hover { transform:translateX(2px); }
+.btn.sm { min-height:34px; }
+@media (max-width:700px) {
+  .nt { display:none; } .nav-btn { padding:9px 11px; } .wrap { padding:18px 12px 60px; }
+  #toast-container { left:12px; right:12px; bottom:12px; } .toast { max-width:none; }
+}
+@media (max-width:480px) { .hide-xs { display:none!important; } }
+
+/* gate */
+#gate { background:radial-gradient(70% 50% at 50% 0%, #2a1f6e, #070514 70%); }
+.gate-card { width:100%; max-width:440px; text-align:center; padding:30px 26px 26px; border-radius:28px; background:rgba(20,16,50,.94); border:1px solid rgba(255,255,255,.12); box-shadow:0 30px 80px rgba(0,0,0,.55); animation:rise .4s ease both; }
+.gate-star { font-size:54px; line-height:1.1; filter:drop-shadow(0 6px 18px rgba(251,191,36,.45)); animation:bob 3s ease-in-out infinite; }
+.gate-title { font-size:40px; font-weight:700; line-height:1.1; margin-top:6px; }
+.gate-sub { color:var(--mute); font-size:14px; margin-top:8px; }
+.core-grid { margin-top:22px; }
+.core-btn { --cc:#a78bfa; --cs:rgba(167,139,250,.16); padding:14px 4px 12px; }
+.core-btn b { font-size:34px; line-height:1; color:var(--cc); }
+.core-btn span { display:block; margin-top:4px; font-family:'Inter',system-ui,sans-serif; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; opacity:.8; }
+.core-btn.c1 { --cc:#38bdf8; --cs:rgba(56,189,248,.16); } .core-btn.c2 { --cc:#34d399; --cs:rgba(52,211,153,.16); }
+.core-btn.c3 { --cc:#fbbf24; --cs:rgba(251,191,36,.16); } .core-btn.c4 { --cc:#fb7185; --cs:rgba(251,113,133,.16); }
+.core-btn:hover { border-color:var(--cc); }
+.core-btn.sel { border-color:var(--cc); background:var(--cs); box-shadow:0 0 26px var(--cs); transform:translateY(-2px); }
+.pin-row { display:flex; justify-content:center; gap:10px; margin-top:22px; }
+.pin-box { width:58px; height:68px; text-align:center; font:700 28px 'JetBrains Mono', ui-monospace, monospace; color:#fff; background:rgba(7,5,20,.8); border:2px solid rgba(255,255,255,.16); border-radius:16px; outline:none; caret-color:#fbbf24; padding:0; }
+.pin-box:focus { border-color:#a78bfa; box-shadow:0 0 0 4px rgba(167,139,250,.25); }
+.pin-box.filled { border-color:rgba(251,191,36,.6); }
+.pin-row.shake { animation:shake .4s; }
+@keyframes shake { 20%,60% { transform:translateX(-8px); } 40%,80% { transform:translateX(8px); } }
+.gate-err { margin-top:14px; padding:10px 12px; border-radius:12px; font-size:13px; font-weight:700; background:rgba(244,63,94,.12); border:1px solid rgba(244,63,94,.5); color:#fecdd3; }
+
+/* projector: slides */
+#projector.slides { padding:0; overflow:hidden; background:#000; }
+.proj.slides-mode { position:absolute; inset:0; }
+.slides-stage { position:absolute; inset:0; background:#000; }
+.slides-stage iframe { width:100%; height:100%; border:0; display:block; background:#111; }
+.slides-mode .proj-bar { position:absolute; top:0; left:0; right:0; z-index:6; padding:14px 22px 36px; background:linear-gradient(180deg, rgba(0,0,0,.85), transparent); opacity:0; transition:opacity .25s; animation:barIn 4s ease; }
+.slides-mode .proj-bar:hover, .slides-mode .proj-bar:focus-within { opacity:1; }
+@keyframes barIn { 0%,75% { opacity:1; } 100% { opacity:0; } }
+@media (hover:none) { .slides-mode .proj-bar { opacity:1; animation:none; } }
+.slides-overlay { position:absolute; inset:0; z-index:5; display:flex; align-items:center; justify-content:center; padding:16px; background:rgba(7,5,20,.9); overflow:auto; }
+.slides-form { width:100%; max-width:560px; }
+
+/* countdown panel */
+.cd-panel { backdrop-filter:none; -webkit-backdrop-filter:none; background:linear-gradient(180deg, var(--acs), rgba(20,16,50,.92) 55%); }
+.cd-head .t, .cd-tag { white-space:nowrap; }
+.cd-toggle { width:30px; height:30px; border-radius:9px; display:grid; place-items:center; background:var(--pnl); border:1px solid var(--line); color:#fff; cursor:pointer; }
+.cd-toggle svg { transition:transform .2s; }
+.cd-toggle[aria-expanded="false"] svg { transform:rotate(-90deg); }
+.cd-mini { display:none; margin-top:12px; padding:10px 12px; border-radius:12px; background:var(--pnl); border:1px solid var(--line); font-size:13px; color:var(--soft); }
+.cd-mini b { color:#fff; font-family:'JetBrains Mono', ui-monospace, monospace; font-variant-numeric:tabular-nums; }
+.cd-panel.collapsed .cd-mini { display:block; }
+.cd-panel.collapsed .cd-body, .cd-panel.collapsed .cd-tag { display:none; }
+.shell.cd-collapsed { grid-template-columns:minmax(0,1fr) 290px; }
+@media (max-width:1100px) { .shell.cd-collapsed { grid-template-columns:minmax(0,1fr); } }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation:none !important; transition:none !important; } }
 </style>
 </head>
@@ -252,23 +320,24 @@ label.lbl { display:block; font-size: 12px; font-weight:800; color:#d4d0f5; marg
 
 <!-- ===== ENTRY GATE ===== -->
 <div id="gate">
-  <div class="card tc" style="max-width:460px;width:100%">
-    <div style="font-size:50px">⭐</div>
-    <h1 class="hero-title disp neon" style="font-size:38px">Star Champions</h1>
-    <p class="muted small mt8">Pick your core and enter your core's 4-digit password.</p>
-    <form id="gate-form" class="mt16" autocomplete="off">
-      <label class="lbl" style="text-align:left">Which core are you in?</label>
-      <div class="core-grid" id="core-grid">
-        <button type="button" class="core-btn" data-core="1"><b>1</b>Core</button>
-        <button type="button" class="core-btn" data-core="2"><b>2</b>Core</button>
-        <button type="button" class="core-btn" data-core="3"><b>3</b>Core</button>
-        <button type="button" class="core-btn" data-core="4"><b>4</b>Core</button>
-      </div>
-      <label class="lbl mt16" style="text-align:left">Password</label>
-      <input class="field mono tc" id="gate-pass" type="password" inputmode="numeric" maxlength="4" placeholder="••••" style="font-size:22px;letter-spacing:.4em" autocomplete="off">
-      <div id="gate-err" class="notice bad mt12 hide"></div>
-      <button class="btn purple lg block mt16" type="submit">Enter</button>
-    </form>
+  <div class="gate-card">
+    <div class="gate-star">⭐</div>
+    <h1 class="gate-title disp neon">Star Champions</h1>
+    <p class="gate-sub">Choose your core, then enter its 4-digit code.</p>
+    <div class="core-grid" id="core-grid" role="radiogroup" aria-label="Choose your core">
+      <button type="button" class="core-btn c1" data-core="1" role="radio" aria-checked="false"><b>1</b><span>Core</span></button>
+      <button type="button" class="core-btn c2" data-core="2" role="radio" aria-checked="false"><b>2</b><span>Core</span></button>
+      <button type="button" class="core-btn c3" data-core="3" role="radio" aria-checked="false"><b>3</b><span>Core</span></button>
+      <button type="button" class="core-btn c4" data-core="4" role="radio" aria-checked="false"><b>4</b><span>Core</span></button>
+    </div>
+    <div class="pin-row" id="pin-row" role="group" aria-label="4-digit code">
+      <input class="pin-box" type="password" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="Digit 1">
+      <input class="pin-box" type="password" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="Digit 2">
+      <input class="pin-box" type="password" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="Digit 3">
+      <input class="pin-box" type="password" inputmode="numeric" maxlength="1" autocomplete="off" aria-label="Digit 4">
+    </div>
+    <div id="gate-err" class="gate-err hide" role="alert"></div>
+    <button class="btn purple lg block mt16" id="gate-go" type="button">Enter</button>
   </div>
 </div>
 
@@ -279,9 +348,9 @@ label.lbl { display:block; font-size: 12px; font-weight:800; color:#d4d0f5; marg
 <div><div class="brand disp neon">Star Champions</div></div>
 </div>
 <div class="nav">
-<button class="nav-btn" id="nav-leaderboard" onclick="switchView('leaderboard')"><span data-ic="trophy"></span>Leaderboard</button>
-<button class="nav-btn" id="nav-student" onclick="openStudent()"><span data-ic="user"></span>Student</button>
-<button class="nav-btn" id="nav-teacher" onclick="openTeacher()"><span data-ic="monitor"></span>Teacher</button>
+<button class="nav-btn" id="nav-leaderboard" onclick="switchView('leaderboard')"><span data-ic="trophy"></span><span class="nt">Leaderboard</span></button>
+<button class="nav-btn" id="nav-student" onclick="openStudent()"><span data-ic="user"></span><span class="nt">Student</span></button>
+<button class="nav-btn" id="nav-teacher" onclick="openTeacher()"><span data-ic="monitor"></span><span class="nt">Teacher</span></button>
 <button class="nav-btn status" id="core-badge" onclick="switchCore()" title="Switch core">Core ?</button>
 <button class="nav-btn status" id="save-badge" onclick="openSaveModal()"><i class="dot" id="save-dot"></i><span id="save-text">Starting...</span></button>
 </div>
@@ -299,6 +368,31 @@ label.lbl { display:block; font-size: 12px; font-weight:800; color:#d4d0f5; marg
 /* ===== SITE GATE SETTINGS ===== */
 const CORE_PASSWORDS = { '1':'9292', '2':'1412', '3':'4314', '4':'9877' };   // <-- one password per core (change them here)
 
+/* ===== LAZY LIBRARIES (loaded only when needed so the page paints fast) ===== */
+const LIBS = {
+  qr:['https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js', 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js'],
+  scanner:['https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js', 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js'],
+  confetti:['https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.browser.min.js'],
+  three:['https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js', 'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js']
+};
+const libP = {};
+function loadLib(name) {
+  if (libP[name]) return libP[name];
+  const urls = (LIBS[name] || []).slice();
+  libP[name] = new Promise(resolve => {
+    const next = () => {
+      const u = urls.shift(); if (!u) return resolve(false);
+      const el = document.createElement('script'); el.src = u; el.async = true;
+      el.onload = () => resolve(true);
+      el.onerror = () => { el.remove(); next(); };
+      document.head.appendChild(el);
+    };
+    next();
+  });
+  return libP[name];
+}
+const idle = fn => (window.requestIdleCallback ? requestIdleCallback(fn, { timeout:3000 }) : setTimeout(fn, 1200));
+
 /* Sandboxed previews block real form submission, so route every submit button through a synthetic submit event */
 document.addEventListener('click', e => {
   const b = e.target.closest && e.target.closest('button[type=submit]');
@@ -309,6 +403,8 @@ document.addEventListener('click', e => {
 }, true);
 
 const IC = {
+slides:'<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M10 8.5l4 2-4 2z"/>',
+chev:'<path d="M6 9l6 6 6-6"/>',
 trophy:'<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
 user:'<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
 monitor:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
@@ -480,11 +576,17 @@ function restoreSession() {
 /* ===== 3D BACKGROUND ENGINE ===== */
 const bg = { boost:0, mx:0, my:0 };
 function initBackground() {
-  if (typeof THREE === 'undefined') return;
+  const canvas = $('bg3d'); if (!canvas) return;
+  const reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const weak = (navigator.hardwareConcurrency || 4) <= 2 || (navigator.deviceMemory && navigator.deviceMemory <= 2);
+  if (reduced || weak) { canvas.style.display = 'none'; return; }
+  idle(() => loadLib('three').then(ok => { if (ok && typeof THREE !== 'undefined') runBackground(canvas); else canvas.style.display = 'none'; }));
+}
+function runBackground(canvas) {
   try {
-    const reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const renderer = new THREE.WebGLRenderer({ canvas:$('bg3d'), alpha:true, antialias:true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    const small = Math.min(window.innerWidth, window.innerHeight) < 700;
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha:true, antialias:false, powerPreference:'low-power' });
+    renderer.setPixelRatio(1);
     const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(60, 1, .1, 100); camera.position.z = 8;
     scene.add(new THREE.AmbientLight(0xffffff, .6));
     const dl = new THREE.DirectionalLight(0xffffff, .9); dl.position.set(4, 6, 8); scene.add(dl);
@@ -493,9 +595,9 @@ function initBackground() {
     const shape = new THREE.Shape();
     for (let i = 0; i < 10; i++) { const r = i % 2 === 0 ? .42 : 1, a = i * Math.PI / 5 + Math.PI / 2, x = Math.cos(a) * r, y = Math.sin(a) * r; if (i) shape.lineTo(x, y); else shape.moveTo(x, y); }
     shape.closePath();
-    const starGeo = new THREE.ExtrudeGeometry(shape, { depth: .35, bevelEnabled:true, bevelThickness:.1, bevelSize:.08, bevelSegments:3 }); starGeo.center();
-    const geos = [starGeo, new THREE.TorusGeometry(.6, .22, 12, 28), new THREE.OctahedronGeometry(.7), new THREE.IcosahedronGeometry(.6)];
-    const colors = [0xfdcb6e, 0xfd79a8, 0x6c5ce7, 0x00cec9, 0x74b9ff, 0xff7675], meshes = [], count = reduced ? 12 : 24;
+    const starGeo = new THREE.ExtrudeGeometry(shape, { depth:.35, bevelEnabled:true, bevelThickness:.1, bevelSize:.08, bevelSegments:2 }); starGeo.center();
+    const geos = [starGeo, new THREE.TorusGeometry(.6, .22, 8, 20), new THREE.OctahedronGeometry(.7), new THREE.IcosahedronGeometry(.6)];
+    const colors = [0xfdcb6e, 0xfd79a8, 0x6c5ce7, 0x00cec9, 0x74b9ff, 0xff7675], meshes = [], count = small ? 8 : 15;
     for (let i = 0; i < count; i++) {
       const g = i % 2 === 0 ? geos[0] : geos[1 + (i % 3)], col = colors[i % colors.length];
       const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color:col, metalness:.35, roughness:.3, emissive:col, emissiveIntensity:.18 }));
@@ -504,36 +606,44 @@ function initBackground() {
       m.userData = { rx:(Math.random() - .5) * .02, ry:(Math.random() - .5) * .03, fy:Math.random() * 6, sp:.3 + Math.random() * .6, baseY:m.position.y };
       scene.add(m); meshes.push(m);
     }
-    const n = reduced ? 120 : 320, arr = new Float32Array(n * 3);
+    const n = small ? 90 : 180, arr = new Float32Array(n * 3);
     for (let i = 0; i < n * 3; i += 3) { arr[i] = (Math.random() - .5) * 40; arr[i + 1] = (Math.random() - .5) * 24; arr[i + 2] = Math.random() * 18; }
     const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(arr, 3));
     const pts = new THREE.Points(pg, new THREE.PointsMaterial({ color:0xffffff, size:.045, transparent:true, opacity:.7 })); scene.add(pts);
     function resize() { renderer.setSize(window.innerWidth, window.innerHeight, false); camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); }
     resize(); window.addEventListener('resize', resize);
-    let t = 0;
-    (function loop() {
-      requestAnimationFrame(loop); if (document.hidden) return;
-      t += .016; bg.boost *= .95; const k = 1 + bg.boost * 7;
-      meshes.forEach(m => { const u = m.userData; m.rotation.x += u.rx * k; m.rotation.y += (u.ry + .004) * k; m.position.y = u.baseY + Math.sin(t * u.sp + u.fy) * .6; });
-      pts.rotation.y += .0005;
-      camera.position.x += (bg.mx * 1.3 - camera.position.x) * .03; camera.position.y += (bg.my * .9 - camera.position.y) * .03; camera.lookAt(0, 0, 0);
+    let t = 0, last = 0, slow = 0, raf = 0;
+    function loop(ts) {
+      raf = requestAnimationFrame(loop);
+      if (document.hidden || ui.projector) { last = ts; return; }
+      const dt = ts - last; if (dt < 33) return;           // cap at ~30fps
+      last = ts;
+      if (dt > 1000) { /* tab was asleep */ } else if (dt > 60) slow++; else slow = Math.max(0, slow - 1);
+      if (slow > 45) { cancelAnimationFrame(raf); canvas.style.display = 'none'; renderer.dispose(); return; }   // device too slow: drop the 3D, keep the CSS glow
+      t += .032; bg.boost *= .93; const k = 1 + bg.boost * 7;
+      meshes.forEach(m => { const u = m.userData; m.rotation.x += u.rx * 2 * k; m.rotation.y += (u.ry + .004) * 2 * k; m.position.y = u.baseY + Math.sin(t * u.sp + u.fy) * .6; });
+      pts.rotation.y += .001;
+      camera.position.x += (bg.mx * 1.3 - camera.position.x) * .06; camera.position.y += (bg.my * .9 - camera.position.y) * .06; camera.lookAt(0, 0, 0);
       renderer.render(scene, camera);
-    })();
-  } catch (e) { console.warn('3D Engine context failure', e); }
+    }
+    raf = requestAnimationFrame(loop);
+  } catch (e) { console.warn('3D background unavailable', e); canvas.style.display = 'none'; }
 }
-let lastTilt = null;
+let lastTilt = null, fxRaf = 0, fxEv = null;
 function bindFx() {
-  document.addEventListener('pointermove', e => {
+  const apply = () => {
+    fxRaf = 0; const e = fxEv; if (!e) return;
     bg.mx = (e.clientX / window.innerWidth - .5) * 2; bg.my = -(e.clientY / window.innerHeight - .5) * 2;
-    const root = document.documentElement.style; root.setProperty('--tx', (bg.mx * 14).toFixed(1)); root.setProperty('--ty', (bg.my * 5).toFixed(1));
-    const el = e.target.closest ? e.target.closest('.tilt') : null;
+    document.querySelectorAll('.stage3d').forEach(st => { st.style.setProperty('--tx', (bg.mx * 14).toFixed(1)); st.style.setProperty('--ty', (bg.my * 5).toFixed(1)); });
+    const el = e.target && e.target.closest ? e.target.closest('.tilt') : null;
     if (lastTilt && lastTilt !== el) lastTilt.style.transform = '';
     if (!el) { lastTilt = null; return; }
     const r = el.getBoundingClientRect(), px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height, max = +el.dataset.tilt || 10;
     el.style.transform = `perspective(900px) rotateX(${((.5 - py) * max).toFixed(2)}deg) rotateY(${((px - .5) * max).toFixed(2)}deg) scale(1.025)`;
     el.style.setProperty('--mx', (px * 100) + '%'); el.style.setProperty('--my', (py * 100) + '%');
     lastTilt = el;
-  });
+  };
+  document.addEventListener('pointermove', e => { if (e.pointerType && e.pointerType !== 'mouse') return; fxEv = e; if (!fxRaf) fxRaf = requestAnimationFrame(apply); }, { passive:true });
   document.addEventListener('mouseleave', () => { if (lastTilt) lastTilt.style.transform = ''; lastTilt = null; });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && ui.projector) closeProjector(); });
 }
@@ -550,47 +660,76 @@ async function boot() {
   const saved = await Store.load();
   if (saved) applyData(saved);
   if (!state.currentQrToken) state.currentQrToken = newCode();
-  await fileInit();
-  restoreSession(); initBackground(); bindFx();
+  restoreSession(); bindFx();
   updateNav(); renderView(ui.view); updateSaveBadge();
   connectCloud();
+  fileInit();
+  initBackground();
+  idle(() => { loadLib('confetti'); loadLib('qr'); });
 }
 /* ===== GATE LOGIC ===== */
 let gateCore = null;
 function startApp(n) {
   window.CORE_ID = 'CORE-' + n; Cloud.room = window.CORE_ID;
   $('gate').classList.add('hide');
-  $('core-badge').textContent = 'Core ' + n;
+  const cb = $('core-badge'); cb.textContent = 'Core ' + n; cb.dataset.core = n;
+  document.title = 'Star Champions • Core ' + n;
   boot(); startCountdown();
 }
 function initGate() {
-  document.querySelectorAll('[data-ic]').forEach(e => { e.innerHTML = ic(e.dataset.ic, 16); });
   let c = null; try { c = sessionStorage.getItem('sc_core'); } catch (e) {}
   if (c && /^[1-4]$/.test(c)) { startApp(c); return; }
-  document.querySelectorAll('.core-btn').forEach(b => b.addEventListener('click', () => {
-    gateCore = b.dataset.core;
-    document.querySelectorAll('.core-btn').forEach(x => x.classList.toggle('sel', x === b));
-    $('gate-pass').focus();
-  }));
-  $('gate-form').addEventListener('submit', e => {
-    e.preventDefault();
-    const err = $('gate-err'), show = m => { err.textContent = m; err.classList.remove('hide'); };
-    if (!gateCore) { show('Pick your core first.'); return; }
-    if ($('gate-pass').value.trim() !== CORE_PASSWORDS[gateCore]) { show('Wrong password for Core ' + gateCore + '. Try again.'); $('gate-pass').value = ''; return; }
-    try { sessionStorage.setItem('sc_core', gateCore); } catch (e2) {}
+  const boxes = Array.from(document.querySelectorAll('.pin-box')), row = $('pin-row'), err = $('gate-err');
+  const code = () => boxes.map(b => b.value).join('');
+  const sync = () => boxes.forEach(b => b.classList.toggle('filled', !!b.value));
+  const fail = m => { err.textContent = m; err.classList.remove('hide'); row.classList.remove('shake'); void row.offsetWidth; row.classList.add('shake'); };
+  function submit() {
+    if (!gateCore) { fail('Pick your core first.'); return; }
+    const v = code();
+    if (v.length < 4) { fail('Enter all 4 digits.'); return; }
+    if (v !== CORE_PASSWORDS[gateCore]) { fail('Wrong code for Core ' + gateCore + '. Try again.'); boxes.forEach(b => { b.value = ''; }); sync(); boxes[0].focus(); return; }
+    try { sessionStorage.setItem('sc_core', gateCore); } catch (e) {}
     startApp(gateCore);
+  }
+  document.querySelectorAll('.core-btn').forEach(b => b.addEventListener('click', () => {
+    gateCore = b.dataset.core; err.classList.add('hide');
+    document.querySelectorAll('.core-btn').forEach(x => { const on = x === b; x.classList.toggle('sel', on); x.setAttribute('aria-checked', String(on)); });
+    (boxes.find(x => !x.value) || boxes[3]).focus();
+    if (code().length === 4) submit();
+  }));
+  boxes.forEach((b, i) => {
+    b.addEventListener('input', () => {
+      b.value = b.value.replace(/\s/g, '').slice(-1); sync(); err.classList.add('hide');
+      if (b.value && i < 3) boxes[i + 1].focus();
+      if (code().length === 4 && gateCore) submit();
+    });
+    b.addEventListener('keydown', e => {
+      if (e.key === 'Backspace' && !b.value && i > 0) { boxes[i - 1].value = ''; boxes[i - 1].focus(); sync(); e.preventDefault(); }
+      else if (e.key === 'ArrowLeft' && i > 0) boxes[i - 1].focus();
+      else if (e.key === 'ArrowRight' && i < 3) boxes[i + 1].focus();
+      else if (e.key === 'Enter') submit();
+    });
+    b.addEventListener('focus', () => b.select());
+    b.addEventListener('paste', e => {
+      const t = ((e.clipboardData || window.clipboardData).getData('text') || '').replace(/\s/g, '').slice(0, 4);
+      if (!t) return; e.preventDefault();
+      boxes.forEach((x, k) => { x.value = t[k] || ''; }); sync();
+      boxes[Math.min(t.length, 3)].focus();
+      if (t.length === 4 && gateCore) submit();
+    });
   });
+  $('gate-go').addEventListener('click', submit);
 }
 function switchCore() {
   try { sessionStorage.removeItem('sc_core'); sessionStorage.removeItem('sc_ui'); } catch (e) {}
   try { window.name = ''; } catch (e) {}
   location.reload();
 }
-window.addEventListener('DOMContentLoaded', initGate);
 async function connectCloud() {
-  if (!window.CloudInit) { Cloud.error = 'Cloud Client Missing'; updateSaveBadge(); softRerender(); return; }
-  await window.CloudInit(Cloud.cfg, Cloud.room, (exists, data, err) => {
-    const wasOn = Cloud.on;
+  for (let i = 0; i < 40 && !window.CloudInit; i++) await new Promise(r => setTimeout(r, 100));
+  if (!window.CloudInit) { Cloud.error = 'Cloud Client Missing'; Cloud.loaded = true; updateSaveBadge(); softRerender(); return; }
+  const okInit = await window.CloudInit(Cloud.cfg, Cloud.room, (exists, data, err) => {
+    const wasOn = Cloud.on; Cloud.loaded = true;
     Cloud.on = !err; Cloud.exists = exists; Cloud.error = err || null;
     let changed = false;
     if (exists && data && data.savedAt !== state.savedAt) { applyData(data); Store.save(getPayload()); lastSaveTime = Date.now(); scheduleFileWrite(); changed = true; }
@@ -598,14 +737,17 @@ async function connectCloud() {
     if (Cloud.on && !exists && ui.teacher && !Cloud.pub) { Cloud.pub = true; publishToCloud(); }
     if (changed || wasOn !== Cloud.on) softRerender();
   });
+  if (!okInit && !Cloud.loaded) { Cloud.loaded = true; if (!Cloud.error) Cloud.error = 'Connection timed out'; updateSaveBadge(); softRerender(); }
 }
 async function publishToCloud() {
   if (!window.CloudPublish || !Cloud.on) { showToast('Backend database offline.', 'error'); return; }
   try { await window.CloudPublish(getPayload()); Cloud.exists = true; showToast('Class data initialized live!', 'success'); refreshSaveCenter(); }
   catch (e) { showToast('Sync failed: ' + (e.code || e.message), 'error'); }
 }
-function softRerender() {
-  if (ui.projector) renderProjector();
+let rrT = 0;
+function softRerender() { if (rrT) return; rrT = setTimeout(() => { rrT = 0; softRerenderNow(); }, 120); }
+function softRerenderNow() {
+  if (ui.projector) { if (ui.projector.mode !== 'slides') renderProjector(); return; }
   if ($('modal').classList.contains('open')) return;
   const v = ui.view;
   if (['leaderboard', 'student-dashboard', 'student-shop'].includes(v)) {
@@ -673,33 +815,101 @@ function standingRow(s, rank, leader) {
 }
 function renderLeaderboardView() {
   const sorted = getSortedStudents(), top3 = sorted.slice(0, 3), leader = sorted.length ? sorted[0].totalEarned : 0, mult = state.settings.multiplier || 1;
-  return `<div class="stack">${connNotice()}<div class="tc"><h2 class="hero-title disp neon">Class Leaderboard</h2><p class="muted small mt8">Scan codes, hit goals, climb the ranks. Lifetime stars decide your rank!</p><div class="mt16"><button class="btn slate sm" onclick="openProjector('board')"><span data-ic="cast"></span>Projector Mode</button></div></div>${mult > 1 ? `<div class="card gold-b tc disp b gold" style="font-size:21px">🔥 STAR POWER IS ON! Every scan = +${mult} stars</div>` : ''}${state.students.length === 0 ? `<div class="card tc" style="max-width:440px;margin:0 auto"><div style="font-size:48px">📋</div><h3 class="ctitle mt8">No students yet</h3><p class="muted small mt8">Ask your teacher to add students in the Teacher Hub.</p><button class="btn purple mt16" onclick="openTeacher()">Open Teacher Hub</button></div>` : `${podiumHTML(top3)}<div class="cols-main"><div class="card"><div class="flex jb ac"><h3 class="ctitle disp">Standings</h3><span class="tiny">${sorted.length} students</span></div><div class="scroll mt16" style="max-height:560px; display:grid; gap:8px">${sorted.map((s,i)=>standingRow(s,i+1,leader)).join('')}</div></div><div class="card"><h3 class="ctitle disp">Live Activity</h3><div class="scroll mt16" style="max-height:560px;display:grid;gap:8px">${state.activity.length === 0 ? '<p class="tiny">Nothing yet. Be the first to scan a code!</p>' : state.activity.map(a => `<div class="feed"><span style="font-size:18px">${a.icon}</span><div><div>${esc(a.msg)}</div><div class="tiny">${clock(a.t)}</div></div></div>`).join('')}</div></div></div>`}</div>`;
+  return `<div class="stack">${connNotice()}<div class="tc"><h2 class="hero-title disp neon">Class Leaderboard</h2><p class="muted small mt8">Scan codes, hit goals, climb the ranks. Lifetime stars decide your rank!</p><div class="mt16 flex jc fw gap8"><button class="btn slate sm" onclick="openProjector('board')"><span data-ic="cast"></span>Projector Mode</button><button class="btn slate sm" onclick="openProjector('slides')"><span data-ic="slides"></span>Show Slides</button></div></div>${mult > 1 ? `<div class="card gold-b tc disp b gold" style="font-size:21px">🔥 STAR POWER IS ON! Every scan = +${mult} stars</div>` : ''}${(state.students.length === 0 && !Cloud.loaded && !Cloud.error) ? '<div class="card tc" style="max-width:440px;margin:0 auto"><div style="font-size:48px">⏳</div><h3 class="ctitle mt8">Loading your class…</h3><p class="muted small mt8">Connecting to live data.</p></div>' : state.students.length === 0 ? `<div class="card tc" style="max-width:440px;margin:0 auto"><div style="font-size:48px">📋</div><h3 class="ctitle mt8">No students yet</h3><p class="muted small mt8">Ask your teacher to add students in the Teacher Hub.</p><button class="btn purple mt16" onclick="openTeacher()">Open Teacher Hub</button></div>` : `${podiumHTML(top3)}<div class="cols-main"><div class="card"><div class="flex jb ac"><h3 class="ctitle disp">Standings</h3><span class="tiny">${sorted.length} students</span></div><div class="scroll mt16" style="max-height:560px; display:grid; gap:8px">${sorted.map((s,i)=>standingRow(s,i+1,leader)).join('')}</div></div><div class="card"><h3 class="ctitle disp">Live Activity</h3><div class="scroll mt16" style="max-height:560px;display:grid;gap:8px">${state.activity.length === 0 ? '<p class="tiny">Nothing yet. Be the first to scan a code!</p>' : state.activity.map(a => `<div class="feed"><span style="font-size:18px">${a.icon}</span><div><div>${esc(a.msg)}</div><div class="tiny">${clock(a.t)}</div></div></div>`).join('')}</div></div></div>`}</div>`;
 }
+/* ===== Google Slides in projector mode ===== */
+const slidesCfg = { url:'', auto:false, secs:5, loop:true, alt:false };
+const slidesKey = () => 'sc_slides_' + (window.CORE_ID || 'x');
+function loadSlidesCfg() { try { Object.assign(slidesCfg, JSON.parse(localStorage.getItem(slidesKey()) || '{}')); } catch (e) {} }
+function saveSlidesCfg() { try { localStorage.setItem(slidesKey(), JSON.stringify(slidesCfg)); } catch (e) {} }
+function parseSlides(input) {
+  let v = String(input || '').trim();
+  const frame = v.match(/src\s*=\s*["']([^"']+)["']/i); if (frame) v = frame[1].replace(/&amp;/g, '&');   // pasted <iframe> embed code works too
+  const m = v.match(/docs\.google\.com\/(?:[^\/\s]+\/)*?presentation\/d\/(e\/)?([A-Za-z0-9_-]+)/);
+  if (!m) return null;
+  const sl = v.match(/[#?&]slide=([A-Za-z0-9_.\-]+)/);
+  return { pub:!!m[1], id:m[2], slide:sl ? sl[1] : null };
+}
+function slidesSrc() {
+  const p = parseSlides(slidesCfg.url); if (!p) return '';
+  const base = 'https://docs.google.com/presentation/d/' + (p.pub ? 'e/' : '') + p.id;
+  if (slidesCfg.alt && !p.pub) return base + '/preview' + (p.slide ? '?slide=' + p.slide : '');
+  const q = new URLSearchParams({ start:slidesCfg.auto ? 'true' : 'false', loop:slidesCfg.loop ? 'true' : 'false', delayms:String(Math.max(1, slidesCfg.secs) * 1000) });
+  if (p.slide) q.set('slide', p.slide);
+  return base + '/embed?' + q.toString();
+}
+function slidesFormHTML(canCancel) {
+  return `<div class="card slides-form"><h3 class="ctitle disp">Show Google Slides</h3><p class="tiny mt8">Paste a Google Slides link. In Slides, click <b>Share → General access → Anyone with the link (Viewer)</b> so it can load here. Published and embed links work too.</p><input class="field mt12" id="slides-url" placeholder="https://docs.google.com/presentation/d/…" value="${esc(slidesCfg.url)}" autocomplete="off" onkeydown="if(event.key==='Enter')applySlides()"><div id="slides-msg" class="notice bad mt12 hide"></div><div class="flex fw gap12 ac mt12"><label class="tiny flex ac gap8" style="cursor:pointer"><input type="checkbox" id="slides-auto" ${slidesCfg.auto ? 'checked' : ''}> Auto-advance</label><label class="tiny flex ac gap8">every <select class="field" id="slides-secs" style="width:auto;padding:6px 8px">${[3, 5, 10, 15, 30, 60].map(n => `<option value="${n}" ${slidesCfg.secs === n ? 'selected' : ''}>${n}s</option>`).join('')}</select></label><label class="tiny flex ac gap8" style="cursor:pointer"><input type="checkbox" id="slides-loop" ${slidesCfg.loop ? 'checked' : ''}> Loop</label></div><div class="flex fw gap8 mt16"><button class="btn purple" onclick="applySlides()">Show Slides</button>${canCancel ? '<button class="btn slate" onclick="closeSlidesForm()">Cancel</button><button class="btn red" onclick="clearSlides()">Remove</button>' : ''}</div></div>`;
+}
+function openSlidesForm() {
+  const st = $('slides-stage'); if (!st || st.querySelector('.slides-overlay')) return;
+  const d = document.createElement('div'); d.className = 'slides-overlay'; d.innerHTML = slidesFormHTML(!!slidesSrc());
+  st.appendChild(d); setTimeout(() => { const i = $('slides-url'); if (i) { i.focus(); i.select(); } }, 30);
+}
+function closeSlidesForm() { const o = document.querySelector('#slides-stage .slides-overlay'); if (o && slidesSrc()) o.remove(); }
+function applySlides() {
+  const v = $('slides-url').value.trim(), msg = $('slides-msg');
+  if (!parseSlides(v)) { msg.textContent = "That doesn't look like a Google Slides link. Copy it from the address bar or the Share button."; msg.classList.remove('hide'); return; }
+  slidesCfg.url = v; slidesCfg.auto = $('slides-auto').checked; slidesCfg.secs = +$('slides-secs').value || 5; slidesCfg.loop = $('slides-loop').checked; slidesCfg.alt = false;
+  saveSlidesCfg(); sfx('pop'); renderProjector(true);
+}
+function clearSlides() { slidesCfg.url = ''; saveSlidesCfg(); renderProjector(true); }
+function toggleAltViewer() { slidesCfg.alt = !slidesCfg.alt; saveSlidesCfg(); renderProjector(true); }
+function reloadSlides() { const f = $('slides-frame'); if (f) f.src = f.src; }
+
 function openProjector(mode) {
-  ui.projector = { mode:(mode === 'qr' && ui.teacher) ? 'qr' : 'board' };
-  $('projector').classList.remove('hide'); renderProjector();
+  loadSlidesCfg();
+  ui.projector = { mode:(mode === 'qr' && ui.teacher) ? 'qr' : (mode === 'slides' ? 'slides' : 'board') };
+  $('projector').classList.remove('hide'); renderProjector(true);
   try { const el = document.documentElement; if (el.requestFullscreen && !document.fullscreenElement) el.requestFullscreen().catch(() => {}); } catch (e) {}
 }
 function closeProjector() {
-  if (!ui.projector) return; ui.projector = null; $('projector').classList.add('hide'); $('projector').innerHTML = '';
+  if (!ui.projector) return; ui.projector = null;
+  const p = $('projector'); p.classList.add('hide'); p.classList.remove('slides'); p.innerHTML = ''; p.dataset.mode = '';
   try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) {}
 }
-function setProjectorMode(m) { if (ui.projector) { ui.projector.mode = m; renderProjector(); } }
-function renderProjector() {
+function setProjectorMode(m) { if (ui.projector) { ui.projector.mode = m; renderProjector(true); } }
+function projBar(mode) {
+  const tab = (m, label) => `<button class="btn sm ${mode === m ? 'purple' : 'slate'}" onclick="setProjectorMode('${m}')">${label}</button>`;
+  let right = '';
+  if (mode === 'slides') {
+    const has = !!slidesSrc(), pub = (parseSlides(slidesCfg.url) || {}).pub;
+    right += `<button class="btn sm slate" onclick="openSlidesForm()"><span data-ic="sliders"></span>Slide link</button>`;
+    if (has) right += (pub ? '' : `<button class="btn sm slate" onclick="toggleAltViewer()">${slidesCfg.alt ? 'Slideshow viewer' : 'Alt viewer'}</button>`) + `<button class="btn sm slate" onclick="reloadSlides()"><span data-ic="rotate"></span>Reload</button>`;
+  }
+  return `<div class="proj-bar"><div class="flex gap8 fw">${tab('board', 'Leaderboard')}${ui.teacher ? tab('qr', 'Scan Code') : ''}${tab('slides', 'Slides')}</div><div class="flex gap8 fw">${right}<button class="btn sm red" onclick="closeProjector()"><span data-ic="x"></span>Exit (Esc)</button></div></div>`;
+}
+function renderProjector(force) {
   const p = $('projector'); if (!ui.projector) return;
-  const sorted = getSortedStudents(), leader = sorted.length ? sorted[0].totalEarned : 0, mode = ui.projector.mode, mult = state.settings.multiplier || 1;
-  const bar = `<div class="proj-bar"><div class="flex gap8">${ui.teacher ? `<button class="btn sm ${mode === 'board' ? 'purple' : 'slate'}" onclick="setProjectorMode('board')">Leaderboard</button><button class="btn sm ${mode === 'qr' ? 'purple' : 'slate'}" onclick="setProjectorMode('qr')">Scan Code</button>` : ''}</div><button class="btn sm red" onclick="closeProjector()"><span data-ic="x"></span>Exit (Esc)</button></div>`;
-  if (mode === 'qr') {
-    p.innerHTML = `<div class="proj">${bar}<h1 class="proj-title disp neon">Scan to earn ${mult>1?'x'+mult:''}⭐</h1><div class="proj-qr"><div class="qr-board"><div id="proj-qr"></div></div><div class="tc"><div class="tiny up" style="font-size:16px">No camera? Type this code</div><div class="bigcode">${esc(state.currentQrToken)}</div><div class="tiny mt8" style="font-size:14px">The code changes after every scan</div></div></div></div>`;
+  const mode = ui.projector.mode;
+  if (mode === 'slides' && p.dataset.mode === 'slides' && !force) return;   // never reload the slide because a score changed
+  p.dataset.mode = mode; p.classList.toggle('slides', mode === 'slides');
+  const bar = projBar(mode);
+  if (mode === 'slides') {
+    const src = slidesSrc();
+    p.innerHTML = `<div class="proj slides-mode">${bar}<div class="slides-stage" id="slides-stage">${src ? `<iframe id="slides-frame" src="${esc(src)}" title="Google Slides" allow="fullscreen; autoplay" allowfullscreen></iframe>` : `<div class="slides-overlay">${slidesFormHTML(false)}</div>`}</div></div>`;
+    if (!src) setTimeout(() => { const i = $('slides-url'); if (i) i.focus(); }, 30);
+  } else if (mode === 'qr') {
+    const mult = state.settings.multiplier || 1;
+    p.innerHTML = `<div class="proj">${bar}<h1 class="proj-title disp neon">Scan to earn ${mult > 1 ? 'x' + mult : ''}⭐</h1><div class="proj-qr"><div class="qr-board"><div id="proj-qr"></div></div><div class="tc"><div class="tiny up" style="font-size:16px">No camera? Type this code</div><div class="bigcode">${esc(state.currentQrToken)}</div><div class="tiny mt8" style="font-size:14px">The code changes after every scan</div></div></div></div>`;
     drawQR($('proj-qr'), state.currentQrToken, Math.floor(Math.min(window.innerHeight * .5, window.innerWidth * .7, 420)));
   } else {
+    const sorted = getSortedStudents(), leader = sorted.length ? sorted[0].totalEarned : 0;
     p.innerHTML = `<div class="proj">${bar}<h1 class="proj-title disp neon">Class Leaderboard</h1>${sorted.length ? podiumHTML(sorted.slice(0, 3)) : '<p class="tc muted mt24">No students yet.</p>'}<div class="proj-grid">${sorted.slice(3, 13).map((s, i) => standingRow(s, i + 4, leader)).join('')}</div></div>`;
   }
   postRender(true);
 }
 function drawQR(el, text, size) {
   if (!el) return; el.innerHTML = '';
-  if (typeof QRCode === 'undefined') { el.innerHTML = '<div style="color:#111;padding:30px;font-weight:800;text-align:center">QR Code Engine Error.<br>Use the 6-character code instead.</div>'; return; }
+  if (typeof QRCode === 'undefined') {
+    el.innerHTML = '<div style="color:#111;padding:30px;font-weight:800;text-align:center">Loading code…</div>';
+    loadLib('qr').then(ok => {
+      if (!el.isConnected) return;
+      if (ok && typeof QRCode !== 'undefined') drawQR(el, text, size);
+      else el.innerHTML = '<div style="color:#111;padding:30px;font-weight:800;text-align:center">QR Code Engine Error.<br>Use the 6-character code instead.</div>';
+    });
+    return;
+  }
   try { new QRCode(el, { text, width:size, height:size, colorDark:'#0b0720', colorLight:'#ffffff' }); } catch (e) { el.textContent = text; }
 }
 function renderStudentLoginView() {
@@ -727,14 +937,18 @@ function renderStudentScannerView() {
   return `<div style="max-width:480px;margin:0 auto" class="stack"><button class="btn slate sm" onclick="switchView('student-dashboard')"><span data-ic="back"></span>Back</button><div class="tc"><h2 class="hero-title disp neon" style="font-size:38px">Scan for Stars</h2><p class="muted small mt8">Point your camera at the teacher's QR code.</p></div><div class="card"><div id="reader" class="small muted" style="border-radius: 14px; overflow:hidden"></div></div><div class="card"><label class="lbl">No camera? Type the 6-character code on the screen:</label><input class="field mono up" id="manual-token-input" maxlength="8" placeholder="K7Q2MX" style="letter-spacing:.25em; font-size:20px;text-align:center" onkeydown="if(event.key==='Enter') submitManualToken()"><button class="btn green lg block mt12" onclick="submitManualToken()">Claim My Star</button></div></div>`;
 }
 function initQrScanner() {
-  setTimeout(() => {
-    const el = $('reader'); if (!el) return;
-    if (typeof Html5QrcodeScanner === 'undefined') { el.innerHTML = '<div class="tc" style="padding:24px"><div style="font-size:34px">📷</div><p class="gold b small mt8">Camera scanner is unavailable here.</p><p class="tiny mt8">Type the code in the box below instead.</p></div>'; return; }
+  const el = $('reader'); if (!el) return;
+  const fallback = '<div class="tc" style="padding:24px"><div style="font-size:34px">📷</div><p class="gold b small mt8">Camera scanner is unavailable here.</p><p class="tiny mt8">Type the code in the box below instead.</p></div>';
+  el.innerHTML = '<div class="tc tiny" style="padding:24px">Starting camera…</div>';
+  loadLib('scanner').then(ok => {
+    const el2 = $('reader'); if (!el2 || ui.view !== 'student-scanner') return;
+    if (!ok || typeof Html5QrcodeScanner === 'undefined') { el2.innerHTML = fallback; return; }
     try {
-      html5QrScanner = new Html5QrcodeScanner('reader', { fps: 10, qrbox:{ width:220, height:220} }, false);
+      el2.innerHTML = '';
+      html5QrScanner = new Html5QrcodeScanner('reader', { fps:10, qrbox:{ width:220, height:220 } }, false);
       html5QrScanner.render(code => processTokenClaim(String(code).trim()), () => {});
-    } catch (err) { el.innerHTML = '<div class="tc" style="padding:20px">Type the code in the box below to claim your star.</div>'; }
-  }, 300);
+    } catch (err) { el2.innerHTML = '<div class="tc" style="padding:20px">Type the code in the box below to claim your star.</div>'; }
+  });
 }
 function submitManualToken() { const i = $('manual-token-input'); if (i && i.value.trim()) processTokenClaim(i.value.trim()); }
 function renderStudentShopView() {
@@ -790,7 +1004,7 @@ function renderTeacherDashboardView() {
   const mult = state.settings.multiplier || 1, tab = ui.tab || 'roster', pend = state.redemptions.filter(x => !x.done).length;
   const cdot = Cloud.configured ? (Cloud.on ? '' : 'bad') : 'warn';
   const body = tab === 'prizes' ? prizesTabHTML() : tab === 'setup' ? `<div id="save-center">${saveCenterHTML()}</div>` : rosterTabHTML();
-  return `<div class="stack"><div class="flex jb ac fw gap16"><div><span class="chip">TEACHER HUB • ${esc(Cloud.room)}</span><h2 class="hero-title disp neon mt8" style="font-size:36px">Command Center</h2><p class="tiny mt8">Students: <b style="color:#fff" id="roster-count">${state.students.length}</b> • Claims Waiting: <b class="gold" id="claims-pending">${pend}</b></p></div><div class="flex fw gap8"><button class="btn goldb sm" onclick="openPicker()"><span data-ic="dice"></span>Random Picker</button><button class="btn slate sm" onclick="openProjector('board')"><span data-ic="cast"></span>Projector</button><button class="btn slate sm" onclick="openSettings()"><span data-ic="sliders"></span>Settings</button><button class="btn slate sm" onclick="lockTeacher()"><span data-ic="lock"></span>Lock</button></div></div>${Cloud.configured&&!Cloud.on?connNotice():''}<div class="card gold-b"><div class="flex ac gap24 fw jc"><div class="qrbox"><div id="teacher-active-qr-canvas"></div></div><div class="f1" style="min-width:250px"><span class="chip gold">STAR DISPENSER</span><div class="mono b gold mt8" style="font-size:34px;letter-spacing:.2em" id="teacher-token-label">${esc(state.currentQrToken)}</div><p class="tiny mt4">Each scan gives <b class="gold">+${mult} star${mult > 1 ? 's' : ''}</b>, then changes.</p><div class="flex fw gap8 mt12 ac"><button class="btn goldb" onclick="openProjector('qr')"><span data-ic="cast"></span>Project Full Screen</button><button class="btn slate sm" onclick="manualRegenerateQr()"><span data-ic="rotate"></span>New Code</button></div><div class="flex fw gap8 mt12 ac"><span class="tiny b">Star Power:</span>${[1, 2, 3].map(n => `<button class="btn sm ${mult===n?'goldb':'slate'}" onclick="setMultiplier(${n})">${n}x</button>`).join('')}</div></div></div></div><div><div class="tabs"><button class="tab ${tab === 'roster' ? 'active' : ''}" onclick="setTab('roster')"><span data-ic="users"></span>Roster</button><button class="tab ${tab === 'prizes' ? 'active' : ''}" onclick="setTab('prizes')"><span data-ic="gift"></span>Prize Store ${pend ? '<span class="chip gold">' + pend + '</span>' : ''}</button><button class="tab ${tab === 'setup' ? 'active' : ''}" onclick="setTab('setup')"><i class="dot ${cdot}"></i>Database Engine</button></div><div class="mt16">${body}</div></div></div>`;
+  return `<div class="stack"><div class="flex jb ac fw gap16"><div><span class="chip">TEACHER HUB • ${esc(Cloud.room)}</span><h2 class="hero-title disp neon mt8" style="font-size:36px">Command Center</h2><p class="tiny mt8">Students: <b style="color:#fff" id="roster-count">${state.students.length}</b> • Claims Waiting: <b class="gold" id="claims-pending">${pend}</b></p></div><div class="flex fw gap8"><button class="btn goldb sm" onclick="openPicker()"><span data-ic="dice"></span>Random Picker</button><button class="btn slate sm" onclick="openProjector('board')"><span data-ic="cast"></span>Projector</button><button class="btn slate sm" onclick="openProjector('slides')"><span data-ic="slides"></span>Slides</button><button class="btn slate sm" onclick="openSettings()"><span data-ic="sliders"></span>Settings</button><button class="btn slate sm" onclick="lockTeacher()"><span data-ic="lock"></span>Lock</button></div></div>${Cloud.configured&&!Cloud.on?connNotice():''}<div class="card gold-b"><div class="flex ac gap24 fw jc"><div class="qrbox"><div id="teacher-active-qr-canvas"></div></div><div class="f1" style="min-width:250px"><span class="chip gold">STAR DISPENSER</span><div class="mono b gold mt8" style="font-size:34px;letter-spacing:.2em" id="teacher-token-label">${esc(state.currentQrToken)}</div><p class="tiny mt4">Each scan gives <b class="gold">+${mult} star${mult > 1 ? 's' : ''}</b>, then changes.</p><div class="flex fw gap8 mt12 ac"><button class="btn goldb" onclick="openProjector('qr')"><span data-ic="cast"></span>Project Full Screen</button><button class="btn slate sm" onclick="manualRegenerateQr()"><span data-ic="rotate"></span>New Code</button></div><div class="flex fw gap8 mt12 ac"><span class="tiny b">Star Power:</span>${[1, 2, 3].map(n => `<button class="btn sm ${mult===n?'goldb':'slate'}" onclick="setMultiplier(${n})">${n}x</button>`).join('')}</div></div></div></div><div><div class="tabs"><button class="tab ${tab === 'roster' ? 'active' : ''}" onclick="setTab('roster')"><span data-ic="users"></span>Roster</button><button class="tab ${tab === 'prizes' ? 'active' : ''}" onclick="setTab('prizes')"><span data-ic="gift"></span>Prize Store ${pend ? '<span class="chip gold">' + pend + '</span>' : ''}</button><button class="tab ${tab === 'setup' ? 'active' : ''}" onclick="setTab('setup')"><i class="dot ${cdot}"></i>Database Engine</button></div><div class="mt16">${body}</div></div></div>`;
 }
 function renderTeacherQrCanvas() { drawQR($('teacher-active-qr-canvas'), state.currentQrToken, 170); }
 async function manualRegenerateQr() {
@@ -1011,7 +1225,7 @@ function sfx(type) {
   } catch (e) {}
 }
 function celebrate() {
-  if (typeof confetti !== 'function') return;
+  if (typeof confetti !== 'function') { loadLib('confetti').then(ok => { if (ok && typeof confetti === 'function') celebrate(); }); return; }
   const base = { colors: ['#fdcb6e', '#fd79a8', '#6c5ce7', '#00cec9', '#74b9ff'], shapes:['star', 'circle'], scalar: 1.2, zIndex: 140 };
   confetti(Object.assign({}, base, { particleCount:70, angle:60, spread:70, origin:{ x:0, y:.7 } }));
   confetti(Object.assign({}, base, { particleCount:70, angle:120, spread:70, origin:{ x:1, y:.7 } }));
@@ -1061,11 +1275,22 @@ function cdSplit(ms) {
   const s = Math.floor(ms / 1e3); ms -= s * 1e3;
   return { d, h, m, s, ms:Math.floor(ms) };
 }
-let cdStarted = false, cdPhase = null;
+let cdStarted = false, cdPhase = null, cdLastSec = -1, cdCollapsed = false;
+const cdText = (id, v) => { const el = $(id); if (el && el.textContent !== v) el.textContent = v; };
+function cdPref() { try { const v = localStorage.getItem('sc_cd_collapsed'); if (v !== null) return v === '1'; } catch (e) {} return window.innerWidth < 1100; }
+function applyCdCollapsed() {
+  const p = $('cd-panel'), t = $('cd-toggle'); if (!p) return;
+  p.classList.toggle('collapsed', cdCollapsed);
+  t.setAttribute('aria-expanded', String(!cdCollapsed)); t.setAttribute('aria-label', cdCollapsed ? 'Expand countdown' : 'Collapse countdown');
+  const sh = document.querySelector('.shell'); if (sh) sh.classList.toggle('cd-collapsed', cdCollapsed);
+}
+function toggleCd() { cdCollapsed = !cdCollapsed; try { localStorage.setItem('sc_cd_collapsed', cdCollapsed ? '1' : '0'); } catch (e) {} applyCdCollapsed(); }
 function startCountdown() {
-  if (cdStarted) return; cdStarted = true;
+  if (cdStarted) return; cdStarted = true; cdCollapsed = cdPref();
   $('side').innerHTML = `<div class="cd-panel" id="cd-panel">
-    <div class="cd-head"><div class="t"><div class="cd-logo">2</div>Track 2 Countdown</div><span class="cd-tag">7th Grade • WCPSS 26–27</span></div>
+    <div class="cd-head"><div class="t"><div class="cd-logo">2</div>Track 2 Countdown</div><div class="flex ac gap8"><span class="cd-tag hide-xs">7th Grade</span><button class="cd-toggle" id="cd-toggle" onclick="toggleCd()" aria-expanded="true" aria-label="Collapse countdown">${ic('chev', 14)}</button></div></div>
+    <div class="cd-mini" id="cd-mini"></div>
+    <div class="cd-body">
     <div class="cd-kicker" id="cd-kicker">Next track-out in</div>
     <div class="cd-title" id="cd-title">—</div>
     <div class="cd-when" id="cd-when"></div>
@@ -1078,33 +1303,37 @@ function startCountdown() {
     <div class="cd-prow"><span id="cd-pl"></span><span class="pct" id="cd-pc">0%</span><span id="cd-pr"></span></div>
     <div class="cd-list" id="cd-list">${EV.map(e => `<div class="cd-item" id="ci${e.i}"><div class="cd-n">${e.last ? '★' : e.i + 1}</div><div class="cd-i"><div class="nm">${e.name}</div><div class="dt">${e.last ? 'Last day: ' : ''}${cdD(e.start, SHORT)}${e.back ? ' → ' + cdD(e.end, SHORT) : ''}</div></div><div class="cd-r" id="cr${e.i}"></div></div>`).join('')}</div>
     <div class="cd-foot">Dates follow the WCPSS 26-27 Year-Round Multi-Track Calendar (Track 2). Countdowns end at ${cdT(EV[0].start)} dismissal; "back to school" uses ${cdT(EV[0].end)}. Weather make-up days can change the calendar — confirm at wcpss.net/calendars.</div>
+    </div>
   </div>`;
-  cdTick(); setInterval(cdTick, 100);
+  applyCdCollapsed(); cdTick(); setInterval(cdTick, 100);
 }
 function cdTick() {
+  const panel = $('cd-panel'); if (!panel) return;
   const now = Date.now();
   let act = EV.find(e => now < e.end);
   const allDone = !act; if (!act) act = EV[EV.length - 1];
   const inBreak = !allDone && now >= act.start;
-  const panel = $('cd-panel'); if (!panel) return;
-  panel.classList.toggle('out', inBreak || allDone);
-  const phase = allDone ? 'done' : (inBreak ? 'out' : 'in') + act.i;
   const prev = EV[act.i - 1];
+  const phase = allDone ? 'done' : (inBreak ? 'out' : 'in') + act.i;
   if (phase !== cdPhase) {
     if (cdPhase && inBreak) celebrate();
-    cdPhase = phase;
-    if (allDone) { $('cd-kicker').textContent = 'Track 2 year complete'; $('cd-title').textContent = 'Enjoy summer! ☀️'; $('cd-when').textContent = ''; }
-    else if (inBreak) { $('cd-kicker').textContent = "🎉 Tracked out — back to school in"; $('cd-title').textContent = act.name; $('cd-when').innerHTML = `Back on <b>${cdD(act.end, { weekday:'long', month:'long', day:'numeric' })}</b> at ${cdT(act.end)}`; }
-    else { $('cd-kicker').textContent = act.last ? 'Countdown to summer break' : 'Next track-out in'; $('cd-title').textContent = act.name; $('cd-when').innerHTML = `<b>${cdD(act.start, { weekday:'long', month:'long', day:'numeric' })}</b> at ${cdT(act.start)}`; }
-    $('cd-pl').textContent = inBreak ? 'Track-out started' : (prev ? 'Back in school' : 'School year started');
-    $('cd-pr').textContent = inBreak ? 'Back to school' : 'Track-out';
+    cdPhase = phase; cdLastSec = -1;
+    panel.classList.toggle('out', inBreak || allDone);
+    if (allDone) { cdText('cd-kicker', 'Track 2 year complete'); cdText('cd-title', 'Enjoy summer! ☀️'); $('cd-when').textContent = ''; }
+    else if (inBreak) { cdText('cd-kicker', '🎉 Tracked out — back to school in'); cdText('cd-title', act.name); $('cd-when').innerHTML = `Back on <b>${cdD(act.end, { weekday:'long', month:'long', day:'numeric' })}</b> at ${cdT(act.end)}`; }
+    else { cdText('cd-kicker', act.last ? 'Countdown to summer break' : 'Next track-out in'); cdText('cd-title', act.name); $('cd-when').innerHTML = `<b>${cdD(act.start, { weekday:'long', month:'long', day:'numeric' })}</b> at ${cdT(act.start)}`; }
+    cdText('cd-pl', inBreak ? 'Track-out started' : (prev ? 'Back in school' : 'School year started'));
+    cdText('cd-pr', inBreak ? 'Back to school' : 'Track-out');
   }
   const target = allDone ? now : (inBreak ? act.end : act.start);
   const p = cdSplit(target - now);
-  $('cd-d').textContent = p.d; $('cd-h').textContent = cdPad(p.h); $('cd-m').textContent = cdPad(p.m); $('cd-s').textContent = cdPad(p.s); $('cd-ms').textContent = cdPad(p.ms, 3);
+  if (!cdCollapsed && !document.hidden) cdText('cd-ms', cdPad(p.ms, 3));
+  const sec = Math.floor(now / 1000); if (sec === cdLastSec) return;   // everything below only changes once a second
+  cdLastSec = sec;
+  cdText('cd-d', String(p.d)); cdText('cd-h', cdPad(p.h)); cdText('cd-m', cdPad(p.m)); cdText('cd-s', cdPad(p.s));
   const from = inBreak ? act.start : (prev ? prev.end : YEAR_START), to = inBreak ? act.end : act.start;
   const pct = allDone ? 100 : Math.min(Math.max((now - from) / (to - from), 0), 1) * 100;
-  $('cd-fill').style.width = pct + '%'; $('cd-pc').textContent = pct.toFixed(2) + '%';
+  $('cd-fill').style.width = pct + '%'; cdText('cd-pc', pct.toFixed(2) + '%');
   const nextEv = EV.find(x => now < x.end);
   EV.forEach(e => {
     const el = $('ci' + e.i), r = $('cr' + e.i); if (!el) return;
@@ -1115,8 +1344,13 @@ function cdTick() {
     if (el.className !== cls) el.className = cls;
     if (r.innerHTML !== html) r.innerHTML = html;
   });
+  const mini = allDone ? 'Enjoy summer! ☀️' : `<b>${p.d}d ${cdPad(p.h)}:${cdPad(p.m)}:${cdPad(p.s)}</b> ${inBreak ? 'until back to school' : 'to ' + act.name}`;
+  if ($('cd-mini').innerHTML !== mini) $('cd-mini').innerHTML = mini;
   document.title = allDone ? 'Star Champions' : `⭐ Star Champions • ${p.d}d ${cdPad(p.h)}:${cdPad(p.m)}:${cdPad(p.s)}`;
 }
+
+/* ===== START ===== */
+initGate();
 </script>
 </body>
 </html>
