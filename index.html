@@ -440,8 +440,6 @@ body{background:#100c2d;color:#fff}.aurora{background:radial-gradient(55% 45% at
 @media(max-width:600px){.projector-meme-corner{right:8px;bottom:8px;width:180px;padding:7px}.projector-meme-img{height:92px}.projector-meme-caption{font-size:11px}.proj.split .projector-meme-corner{left:7px;width:160px}.proj.split .projector-meme-img{height:78px}}
 
 
-.mcx-dance-dock{position:absolute;left:50%;bottom:47px;transform:translateX(-50%);z-index:4;display:flex;align-items:center;justify-content:center;gap:6px;max-width:calc(100% - 116px);padding:7px 9px;border:1px solid #ffffff25;border-radius:14px;background:#17142bdc;box-shadow:0 5px 18px #08051c66;backdrop-filter:blur(8px)}
-.mcx-dance-label{font-size:10px;font-weight:900;color:#ffe49a;white-space:nowrap}.mcx-dance-btn{border:1px solid #ffffff24;border-radius:9px;padding:7px 9px;background:#ffffff12;color:#fff;font-family:inherit;font-size:11px;font-weight:700;white-space:nowrap;cursor:pointer}.mcx-dance-btn:hover,.mcx-dance-btn:focus-visible{background:#8a68ff55;border-color:#c5b6ff;outline:none}
 @media(max-width:600px){.mcx-dance-dock{bottom:45px;max-width:calc(100% - 94px);gap:4px;padding:5px}.mcx-dance-label{display:none}.mcx-dance-btn{padding:6px 7px;font-size:10px}.mcx-hint{font-size:9px}}
 
 
@@ -519,7 +517,7 @@ body{background:#100c2d;color:#fff}.aurora{background:radial-gradient(55% 45% at
 <div id="projector" class="hide"></div>
 <div id="print-sheet" aria-hidden="true"></div>
 <div id="toast-container"></div>
-<div id="modal" onclick="if(event.target===this)closeModal()"><div id="modal-content" class="card"></div></div>
+<div id="modal" onclick="if(event.target===this)closeModal()"><div id="modal-content" class="card" role="dialog" aria-modal="true" aria-label="Dialog"></div></div>
 <input type="file" id="json-import-input" accept=".json, application/json" class="hide" onchange="handleImportFile(event)">
 <script>
 /* ===== SITE GATE SETTINGS ===== */
@@ -966,7 +964,16 @@ function renderView(name, quiet) {
     postRender(quiet);
   } catch (e) { console.error(e); showFatal('Render Failed: ' + e.message); }
 }
+function a11yPass() {
+  document.querySelectorAll('input:not([type=hidden]):not([aria-label]),select:not([aria-label]),textarea:not([aria-label])').forEach(e => {
+    if ((e.id && document.querySelector('label[for="' + e.id + '"]')) || e.closest('label')) return;
+    const t = e.getAttribute('placeholder') || e.title || e.name; if (t) e.setAttribute('aria-label', t);
+  });
+  document.querySelectorAll('button:not([aria-label])').forEach(b => { if (!b.textContent.trim() && b.title) b.setAttribute('aria-label', b.title); });
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('modal') && $('modal').classList.contains('open')) closeModal(); });
 function postRender(quiet) {
+  a11yPass();
   renderClassAnnouncement();
   document.querySelectorAll('[data-ic]').forEach(e => { if (!e.innerHTML) e.innerHTML = ic(e.dataset.ic, +e.dataset.s || 16); });
   document.querySelectorAll('[data-count]').forEach(el => {
@@ -1056,7 +1063,7 @@ function renderWeeklyQuizHTML(){
  }
  return `<section class="card fun-card weekly-quiz-card"><div class="flex jb ac gap8 fw"><span class="chip">🧠 WEEKLY SCIENCE · ${esc(quiz.weekId)}</span><span class="tiny">10 questions · 1 star</span></div><h2 class="ctitle disp mt8">${esc(quiz.unit||'Brain Boost')}</h2><p class="tiny mt8">${esc(quiz.focus||'Grade 7 science · Motion and Stability · Forces and Interactions')}</p><div class="weekly-standard mt12">One try this week • answer all 10 correctly to earn ⭐ 1 star</div><button class="btn purple block mt12" onclick="startWeeklyQuiz()">Start this week’s quiz</button></section>`;
 }
-function renderFunScreenView(){return `<div class="fun-screen stack"><header class="fun-hero card"><div><span class="chip gold">🎉 STAR CHAMPIONS ARCADE</span><h1 class="hero-title disp neon mt8">Fun Screen</h1><p class="muted small mt8">Play a quick reflex game, take this week’s science quiz, or visit your avatar studio.</p></div><div class="fun-score-pill">⚡ ${funScore} reflex points</div></header><div class="fun-grid"><section class="card fun-card reaction-card"><span class="chip">⚡ QUICK REFLEX</span><h2 class="ctitle disp mt8">Tap the star!</h2><p class="tiny mt4">Start the round, then hit the glowing star as fast as you can.</p><button id="reaction-target" class="reaction-target" onclick="hitReactionTarget()">⭐</button><div id="reaction-message" class="fun-message">${esc(funMessage)}</div><button class="btn purple block mt8" onclick="startReactionGame()">Start a 3-second round</button></section>${renderWeeklyQuizHTML()}<section class="card fun-card dance-card"><span class="chip">🕺 DANCE BREAK</span><h2 class="ctitle disp mt8">Fortnite-style emotes</h2><p class="tiny mt4">Try five short block-character dance moves in Skin Studio.</p><button class="btn goldb mt12" onclick="openFunDance()">🧍 Open avatar emotes</button></section></div></div>`;}
+function renderFunScreenView(){return `<div class="fun-screen stack"><header class="fun-hero card"><div><span class="chip gold">🎉 STAR CHAMPIONS ARCADE</span><h1 class="hero-title disp neon mt8">Fun Screen</h1><p class="muted small mt8">Play a quick reflex game, take this week’s science quiz, or visit your avatar studio.</p></div><div class="fun-score-pill">⚡ ${funScore} reflex points</div></header><div class="fun-grid"><section class="card fun-card reaction-card"><span class="chip">⚡ QUICK REFLEX</span><h2 class="ctitle disp mt8">Tap the star!</h2><p class="tiny mt4">Start the round, then hit the glowing star as fast as you can.</p><button id="reaction-target" class="reaction-target" aria-label="Tap the star" onclick="hitReactionTarget()">⭐</button><div id="reaction-message" class="fun-message">${esc(funMessage)}</div><button class="btn purple block mt8" onclick="startReactionGame()">Start a 3-second round</button></section>${renderWeeklyQuizHTML()}<section class="card fun-card dance-card"><span class="chip">🕺 DANCE BREAK</span><h2 class="ctitle disp mt8">Fortnite-style emotes</h2><p class="tiny mt4">Try five short block-character dance moves in Skin Studio.</p><button class="btn goldb mt12" onclick="openFunDance()">🧍 Open avatar emotes</button></section></div></div>`;}
 function startReactionGame(){clearTimeout(funReactionTimer);const b=$('reaction-target'),m=$('reaction-message');if(!b||!m)return;b.classList.remove('ready');b.disabled=true;m.textContent='Get ready…';const delay=700+Math.random()*1600;funReactionTimer=setTimeout(()=>{if(!$('reaction-target'))return;funReactionStart=performance.now();b.disabled=false;b.classList.add('ready');m.textContent='NOW! Tap the star!';funReactionTimer=setTimeout(()=>{if(b.isConnected&&!b.disabled){b.disabled=true;b.classList.remove('ready');m.textContent='Round over! Try again.';}},3000);},delay);}
 function hitReactionTarget(){const b=$('reaction-target'),m=$('reaction-message');if(!b||b.disabled)return;const ms=Math.round(performance.now()-funReactionStart);b.disabled=true;b.classList.remove('ready');funScore++;m.textContent='⭐ '+ms+' ms! Great reflexes!';sfx('pop');}
 function openFunDance(){if(!ui.activeStudentId||!activeStudent()){showToast('Log in as a student first to dance your avatar.','info');switchView('student-login');return;}switchView('student-skins');}
@@ -1558,7 +1565,7 @@ function rosterHTML() {
   return list.map((st, idx) => `<div class="roster-row srow fw" data-name="${esc(st.name.toLowerCase())}"><div class="rank">#${idx + 1}</div><div class="av" style="font-size:22px">${st.avatar}</div><div class="f1" style="min-width:150px"><div class="sname">${esc(st.name)}</div><div class="tiny"><b class="gold">⭐ ${st.stars}</b> (${st.totalEarned} lifetime) • PIN: <b class="mono" style="color:#a5b4fc">${esc(st.pin)}</b></div></div><div class="flex gap4"><button class="btn green sm" onclick="teacherAdjustStars('${esc(st.id)}', 1)">+1</button><button class="btn blue sm" onclick="teacherAdjustStars('${esc(st.id)}', 5)">+5</button><button class="btn red sm" onclick="teacherAdjustStars('${esc(st.id)}', -1)">-1</button><button class="btn slate sm" title="New PIN" onclick="resetPin('${esc(st.id)}')"><span data-ic="key" data-s="14"></span></button><button class="btn slate sm" onclick="deleteStudent('${esc(st.id)}')"><span data-ic="trash" data-s="14"></span></button></div></div>`).join('');
 }
 function prizesHTML() {
-  return state.prizes.map(p => `<div class="srow"><div class="av" style="font-size:24px">${esc(p.icon)}</div><div class="f1"><div class="sname trunc" style="font-size:13.5px">${esc(p.title)}</div><div class="tiny"><b class="gold">⭐ ${p.cost}</b> • Stock: ${p.stock}</div></div><div class="flex gap4"><button class="btn slate sm" onclick="adjustStock('${esc(p.id)}', -1)">-</button><button class="btn slate sm" onclick="adjustStock('${esc(p.id)}', 1)">+</button><button class="btn slate sm" onclick="deletePrize('${esc(p.id)}')"><span data-ic="trash" data-s="14"></span></button></div></div>`).join('') || '<p class="tiny">No prizes yet.</p>';
+  return state.prizes.map(p => `<div class="srow"><div class="av" style="font-size:24px">${esc(p.icon)}</div><div class="f1"><div class="sname trunc" style="font-size:13.5px">${esc(p.title)}</div><div class="tiny"><b class="gold">⭐ ${p.cost}</b> • Stock: ${p.stock}</div></div><div class="flex gap4"><button class="btn slate sm" aria-label="Decrease stock" onclick="adjustStock('${esc(p.id)}', -1)">-</button><button class="btn slate sm" aria-label="Increase stock" onclick="adjustStock('${esc(p.id)}', 1)">+</button><button class="btn slate sm" onclick="deletePrize('${esc(p.id)}')"><span data-ic="trash" data-s="14"></span></button></div></div>`).join('') || '<p class="tiny">No prizes yet.</p>';
 }
 function claimsHTML() {
   const list = [...state.redemptions].sort((a, b) => (a.done - b.done) || (b.t - a.t)).slice(0, 40);
@@ -2095,6 +2102,29 @@ initGate();
 @media(max-width:980px){.mcx-grid{grid-template-columns:1fr}.mcx-left{border-right:0;border-bottom:3px solid #0c120e}.mcx-stage{height:clamp(360px,52vh,520px)}.mcx-catalog{max-height:none}}
 @media(max-width:560px){.mcx-catalog{grid-template-columns:1fr}.mcx-closet,.mcx-left{padding:12px}.mcx-top h1{font-size:21px}}
 @media(prefers-reduced-motion:reduce){.mcx-cloud{animation:none!important}}
+.mcx-stage.boy{background:linear-gradient(#3f8fe0,#86c8ff 55%,#cdeeff)}
+.mcx-stage.girl{background:linear-gradient(#a56ee0,#ff9fd2 55%,#ffe3f1)}
+.mcx-gtag{display:inline-block;margin-left:6px;padding:3px 10px;border-radius:99px;font-size:10.5px;font-weight:900;letter-spacing:.06em;border:2px solid #0c120e;color:#fff}
+.mcx-gtag.boy{background:#2f7fd8}.mcx-gtag.girl{background:#e0559f}
+.mcx-pop{position:absolute;left:50%;top:13%;transform:translateX(-50%);z-index:6;display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 16px;max-width:94%;background:#ffe27a;color:#2a2108;border:3px solid #0c120e;border-radius:10px;box-shadow:0 5px 0 #7a5d0a,0 0 40px #ffe27a99;font-weight:900;animation:mcxPop 2.7s cubic-bezier(.2,1.4,.4,1) forwards;pointer-events:none;text-align:center}
+.mcx-pop .mc-mini{height:78px;filter:none;display:block;margin:0 auto}
+.mcx-pop small{display:block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.7;font-weight:900}
+.mcx-pop .arrow{font-size:28px;line-height:1}
+.mcx-pop .txt{font-size:15px;line-height:1.25;max-width:150px}
+@keyframes mcxPop{0%{opacity:0;transform:translate(-50%,24px) scale(.4)}12%{opacity:1;transform:translate(-50%,0) scale(1.1)}20%{transform:translate(-50%,0) scale(1)}82%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-16px) scale(.95)}}
+.mcx-chip.new{animation:mcxNew .7s ease 2;background:#ffe27a;color:#2a2108}
+@keyframes mcxNew{50%{transform:scale(1.22)}}
+.mcx-dance{margin-top:12px;padding:10px;border:3px solid #0c120e;border-radius:10px;background:#1b2820}
+.mcx-dh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.mcx-dh b{font-size:13px;letter-spacing:.06em;color:#ffe27a}
+.mcx-dmini{padding:5px 9px;border:2px solid #0c120e;border-radius:6px;background:#3a3a3a;color:#fff;font:800 11px Inter,system-ui;cursor:pointer}
+.mcx-dmini:hover{background:#5d9a46}
+.mcx-dgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.mcx-dbtn{display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 2px 5px;border:2px solid #0c120e;border-bottom-width:4px;border-radius:6px;background:#3a3a3a;color:#e5ece0;font:800 10.5px Inter,system-ui;cursor:pointer;transition:transform .1s,background .1s}
+.mcx-dbtn i{font-style:normal;font-size:20px;line-height:1.15}.mcx-dbtn:hover{background:#4e6a4a;transform:translateY(-2px)}
+.mcx-dbtn.on{background:#ffe27a;color:#2a2108;border-bottom-color:#a8861f;animation:mcxJig .45s ease-in-out infinite alternate}
+@keyframes mcxJig{from{transform:rotate(-3deg)}to{transform:rotate(3deg)}}
+@media(max-width:420px){.mcx-dgrid{grid-template-columns:repeat(3,1fr)}}
 </style>
 
 <script id="mcx-js">
@@ -2112,9 +2142,33 @@ let avatarCatalogQuery = '';
 const TABS = [['body', 'Body', '🧍'], ['hair', 'Hair', '💇'], ['shirt', 'Tops', '👕'], ['pants', 'Pants', '👖'], ['shoes', 'Shoes', '👟'], ['hat', 'Hats', '🧢'], ['backpack', 'Bags', '🎒'], ['accessory', 'Extras', '✨']];
 const SHORT_SLEEVE = ['shirt-basic', 'shirt-boy-dino', 'shirt-boy-soccer', 'shirt-girl-star'];
 const JACKETS = ['shirt-girl-denim', 'shirt-mint', 'shirt-gold', 'shirt-boy-hoodie', 'shirt-girl-hoodie'];
-function hatColor(id) { return id.includes('wizard') ? '#7148b7' : id.includes('dino') ? '#5fac57' : id.includes('space') ? '#e9eef7' : id.includes('sun') ? '#f3c844' : id.includes('flower') ? '#e77eb3' : id.includes('beanie') ? '#8c67d5' : id.includes('crown') ? '#f3ca42' : '#dc594a'; }
+function hatColor(id) { const hi = avatarItem(id); if (hi && hi.color) return hi.color; return id.includes('wizard') ? '#7148b7' : id.includes('dino') ? '#5fac57' : id.includes('space') ? '#e9eef7' : id.includes('sun') ? '#f3c844' : id.includes('flower') ? '#e77eb3' : id.includes('beanie') ? '#8c67d5' : id.includes('crown') ? '#f3ca42' : '#dc594a'; }
 function itemColor(it) { return it ? (it.color || (it.slot === 'hat' ? hatColor(it.id) : '#ffe27a')) : '#ffe27a'; }
 function lookWith(s, extraId) { const a = { ...avatarData(s) }; const it = extraId && avatarItem(extraId); if (it && (!it.gender || it.gender === a.gender)) a[it.slot] = it.id; return a; }
+const girlSkirt = a => { const p = avatarItem(a.pants); return !!p && (p.id === 'pants-girl-skirt' || (a.gender === 'girl' && p.id === 'pants-basic')); };
+let mcxNew = null;
+const beat = {
+  ac: null, on: true, timer: null, step: 0, next: 0, noise: null,
+  start() {
+    if (!this.on) return;
+    try { this.ac = this.ac || new (window.AudioContext || window.webkitAudioContext)(); if (this.ac.state === 'suspended') this.ac.resume(); } catch (e) { return; }
+    this.stop(); this.step = 0; this.next = this.ac.currentTime + .05; this.timer = setInterval(() => this.tick(), 60);
+  },
+  stop() { clearInterval(this.timer); this.timer = null; },
+  tick() { const ac = this.ac; if (!ac) return; while (this.next < ac.currentTime + .2) { this.play(this.step, this.next); this.next += .25; this.step = (this.step + 1) % 16; } },
+  osc(type, f, t0, dur, vol, f2) { const ac = this.ac, o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.setValueAtTime(f, t0); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t0 + dur); g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(.001, t0 + dur); o.connect(g); g.connect(ac.destination); o.start(t0); o.stop(t0 + dur + .02); },
+  hit(t0, dur, vol, hp) {
+    const ac = this.ac; if (!this.noise) { const b = ac.createBuffer(1, ac.sampleRate * .3, ac.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; this.noise = b; }
+    const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain(); s.buffer = this.noise; f.type = 'highpass'; f.frequency.value = hp; g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(.001, t0 + dur); s.connect(f); f.connect(g); g.connect(ac.destination); s.start(t0); s.stop(t0 + dur + .02);
+  },
+  play(i, t) {
+    if (i % 2 === 0) this.osc('sine', 150, t, .2, .5, 45);
+    if (i % 4 === 2) this.hit(t, .12, .22, 1500);
+    if (i % 2 === 1) this.hit(t, .04, .08, 7000);
+    const bass = [55, 0, 55, 0, 65.4, 0, 49, 0][i % 8]; if (bass) this.osc('square', bass * 2, t, .22, .07);
+    if (i % 8 === 4) this.osc('triangle', [440, 523.25, 392, 587.33][(i >> 3) % 4 + 0] , t, .18, .05);
+  }
+};
 const lookKey = a => [a.gender, a.tone, a.hair, a.shirt, a.pants, a.shoes, a.hat || '', a.backpack || '', a.accessory || ''].join('|');
 
 /* =============================================================
@@ -2123,6 +2177,53 @@ const lookKey = a => [a.gender, a.tone, a.hair, a.shirt, a.pants, a.shoes, a.hat
    ============================================================= */
 const RG = (u, v, w, h, d) => ({ top: [u + d, v, w, d], bottom: [u + d + w, v, w, d], right: [u, v + d, d, h], front: [u + d, v + d, w, h], left: [u + d + w, v + d, d, h], back: [u + 2 * d + w, v + d, w, h] });
 const SIDES = ['right', 'front', 'left', 'back'], ALL = ['top', 'bottom', 'right', 'front', 'left', 'back'];
+
+function extraShirt(st, b, F, Bk, Rm, Lm, rect, pat, sc, rnd) {
+  const FB = [F, Bk], AR = [Rm, Lm], dk = sh(sc, -40), lt = sh(sc, 42), W = '#ffffff';
+  switch (st) {
+    case 'pizza': pat(b, F, 0, 2, ['########', '.######.', '..####..', '...##...'], '#f2a23a'); [[2, 3], [5, 3], [3, 4]].forEach(([x, y]) => rect(b, F, x, y, 1, 1, '#c43a3a')); rect(b, F, 0, 2, 8, 1, '#d98a2a'); return true;
+    case 'ocean': for (let y = 1; y < 10; y += 3) FB.forEach(r => { for (let x = 0; x < 8; x++) rect(b, r, x, y + (x % 2), 1, 1, lt); }); pat(b, F, 2, 5, ['.###.#', '######', '.###.#'], '#ffb347'); rect(b, F, 5, 6, 1, 1, '#222'); return true;
+    case 'redstone': FB.forEach(r => { rect(b, r, 3, 0, 1, 10, '#ff3b2a'); rect(b, r, 0, 4, 8, 1, '#ff3b2a'); [[1, 1], [6, 1], [1, 7], [6, 7]].forEach(([x, y]) => rect(b, r, x, y, 1, 1, '#ffb0a0')); rect(b, r, 3, 4, 1, 1, '#fff'); }); return true;
+    case 'creeper': { const g = '#2f6b2a'; FB.forEach(r => { for (let n = 0; n < 22; n++) rect(b, r, Math.floor(rnd() * 8), Math.floor(rnd() * 10), 1, 1, n % 2 ? g : lt); }); rect(b, F, 1, 2, 2, 2, '#0b0b0b'); rect(b, F, 5, 2, 2, 2, '#0b0b0b'); rect(b, F, 3, 4, 2, 2, '#0b0b0b'); rect(b, F, 2, 6, 4, 2, '#0b0b0b'); rect(b, F, 2, 7, 1, 1, sc); rect(b, F, 5, 7, 1, 1, sc); return true; }
+    case 'cloud': pat(b, F, 0, 2, ['..###...', '.#####.#', '########', '.######.'], W); pat(b, Bk, 1, 3, ['.###.', '#####', '.###.'], W); AR.forEach(r => rect(b, r, 0, 6, r[2], 1, W)); return true;
+    case 'volcano': pat(b, F, 1, 2, ['...#....', '..###...', '.#####..', '#######.'], '#5a2a1e'); rect(b, F, 3, 1, 1, 1, '#ffd23a'); rect(b, F, 4, 0, 1, 1, '#ff7a2a'); rect(b, Bk, 2, 2, 1, 5, W); rect(b, Bk, 4, 2, 2, 1, W); rect(b, Bk, 5, 3, 1, 2, W); rect(b, Bk, 4, 5, 2, 1, W); rect(b, F, 0, 9, 8, 1, '#ffd23a'); return true;
+    case 'bee': [2, 5, 8].forEach(y => { FB.forEach(r => rect(b, r, 0, y, 8, 1, '#222')); AR.forEach(r => rect(b, r, 0, y % 6, r[2], 1, '#222')); }); rect(b, F, 3, 0, 2, 1, '#222'); return true;
+    case 'frost': pat(b, F, 1, 1, ['..##..', '.####.', '######', '.####.', '..##..'], '#e6fbff'); rect(b, F, 3, 3, 2, 1, sc); AR.forEach(r => { rect(b, r, 0, 0, r[2], 2, '#e6fbff'); rect(b, r, 0, 3, r[2], 1, lt); }); return true;
+    case 'jungle': rect(b, F, 0, 0, 2, 10, dk); rect(b, F, 6, 0, 2, 10, dk); rect(b, F, 1, 5, 2, 3, sh(sc, 22)); rect(b, F, 5, 5, 2, 3, sh(sc, 22)); rect(b, F, 3, 0, 2, 10, '#d8c48a'); pat(b, Bk, 2, 2, ['.#..', '###.', '.##.'], '#9ad45a'); return true;
+    case 'moon': pat(b, F, 2, 1, ['.###.', '##...', '##...', '##...', '.###.'], '#ffe9a0'); [[6, 2], [5, 7], [1, 8], [6, 5]].forEach(([x, y]) => rect(b, F, x, y, 1, 1, W)); [[2, 3], [5, 6]].forEach(([x, y]) => rect(b, Bk, x, y, 1, 1, W)); rect(b, F, 0, 9, 8, 1, '#ffe9a0'); return true;
+    case 'blossom': [[1, 1], [5, 3], [1, 6], [5, 8]].forEach(([x, y]) => FB.forEach(r => { rect(b, r, x + 1, y, 1, 1, W); rect(b, r, x, y + 1, 3, 1, W); rect(b, r, x + 1, y + 2, 1, 1, W); rect(b, r, x + 1, y + 1, 1, 1, '#ffd54a'); })); return true;
+    case 'lava': for (let y = 1; y < 10; y += 2) FB.forEach(r => { for (let x = 0; x < 8; x++) rect(b, r, x, y + ((x >> 1) % 2), 1, 1, y % 4 === 1 ? '#ffb02e' : '#ffe27a'); }); return true;
+    case 'diamond': pat(b, F, 1, 2, ['..##..', '.####.', '######', '.####.', '..##..'], '#8ff4ff'); rect(b, F, 2, 3, 1, 1, W); rect(b, F, 3, 2, 1, 1, W); FB.forEach(r => rect(b, r, 0, 0, 8, 1, dk)); return true;
+    case 'mushroom': rect(b, F, 0, 0, 8, 4, '#d8473a'); [[1, 1], [4, 1], [6, 2], [2, 3]].forEach(([x, y]) => rect(b, F, x, y, 1, 1, W)); rect(b, F, 2, 4, 4, 5, '#f4ead0'); rect(b, Bk, 0, 0, 8, 3, '#d8473a'); [[2, 1], [5, 1]].forEach(([x, y]) => rect(b, Bk, x, y, 1, 1, W)); return true;
+    case 'parrot': ['#e8344a', '#ffd23a', '#3a9bff', '#35a578'].forEach((c, i) => { FB.forEach(r => rect(b, r, 0, 1 + i * 2, 8, 1, c)); }); rect(b, F, 5, 4, 2, 2, W); rect(b, F, 6, 4, 1, 1, '#111'); rect(b, F, 7, 5, 1, 1, '#ffb02e'); return true;
+    case 'skate': for (let x = 0; x < 8; x++) for (let y = 0; y < 10; y++) if ((x + y) % 2 === 0 && (y < 2 || y > 7)) FB.forEach(r => rect(b, r, x, y, 1, 1, '#ffffff')); pat(b, F, 2, 3, ['#####', '#...#', '#####'], '#ffe56f'); return true;
+    case 'goal': rect(b, F, 0, 0, 1, 10, W); rect(b, F, 7, 0, 1, 10, W); rect(b, F, 2, 1, 4, 1, '#3a3a45'); rect(b, F, 3, 3, 2, 3, '#3a3a45'); rect(b, F, 2, 3, 1, 1, '#3a3a45'); rect(b, Bk, 2, 2, 4, 1, '#3a3a45'); rect(b, Bk, 2, 2, 1, 3, '#3a3a45'); rect(b, Bk, 2, 4, 4, 1, '#3a3a45'); rect(b, Bk, 5, 2, 1, 6, '#3a3a45'); rect(b, Bk, 2, 7, 4, 1, '#3a3a45'); return true;
+    case 'arctic': pat(b, F, 2, 3, ['.#.#.', '#####', '.###.', '..#..'], '#ffffff'); rect(b, F, 0, 8, 8, 1, '#ffffff'); AR.forEach(r => rect(b, r, 0, 0, r[2], 3, '#ffffff')); return true;
+    case 'comet': for (let i = 0; i < 8; i++) { FB.forEach(r => { rect(b, r, i, i, 1, 1, '#ffffff'); rect(b, r, i, i + 1, 1, 1, lt); rect(b, r, Math.max(0, i - 1), i, 1, 1, '#9a8aff'); }); } rect(b, F, 5, 1, 2, 2, '#ffe56f'); return true;
+    case 'garden': rect(b, F, 1, 0, 1, 4, '#8a5a2b'); rect(b, F, 6, 0, 1, 4, '#8a5a2b'); rect(b, F, 1, 4, 6, 6, sh(sc, -26)); rect(b, F, 2, 5, 4, 2, sh(sc, -50)); rect(b, F, 3, 6, 2, 1, '#ffd23a'); rect(b, Bk, 1, 0, 1, 10, '#8a5a2b'); rect(b, Bk, 6, 0, 1, 10, '#8a5a2b'); AR.forEach(r => rect(b, r, 0, 0, r[2], 10, '#f4ead0')); return true;
+    case 'coral': pat(b, F, 1, 1, ['#.#..#', '#.#.##', '######', '.####.'], '#ff9a5a'); FB.forEach(r => rect(b, r, 0, 9, 8, 1, '#35a5c8')); return true;
+    case 'knight': rect(b, F, 3, 0, 2, 10, '#d8d8e4'); rect(b, F, 1, 3, 6, 2, '#d8d8e4'); rect(b, F, 3, 3, 2, 2, '#d8473a'); [3, 6, 9].forEach(y => rect(b, Bk, 0, y, 8, 1, dk)); AR.forEach(r => { rect(b, r, 0, 0, r[2], 4, '#aeb4c4'); rect(b, r, 0, 4, r[2], 1, dk); }); return true;
+  }
+  return false;
+}
+function pantsArt(st, b, fr, os, rect, pc, rnd, n) {
+  const dk = sh(pc, -34), lt = sh(pc, 40);
+  switch (st) {
+    case 'cave': [[0, 1], [2, 4], [1, 7]].forEach(([x, y]) => { rect(b, fr, x, y, 2, 1, dk); rect(b, os, x, y + 1, 2, 1, dk); }); break;
+    case 'emerald': rect(b, os, 0, 3, 4, 3, lt); rect(b, os, 1, 4, 2, 1, '#6fe39a'); rect(b, fr, 0, 8, 4, 1, dk); break;
+    case 'lava': rect(b, os, 1, 0, 2, 9, '#ffb02e'); rect(b, fr, 0, 6, 4, 1, '#ffe27a'); break;
+    case 'sea': rect(b, fr, 0, 0, 4, 2, lt); rect(b, os, 0, 0, 4, 2, lt); rect(b, fr, 1, 5, 2, 2, dk); break;
+    case 'cherry': for (let y = 0; y < 9; y++) for (let x = 0; x < 4; x++) if ((x + y) % 2 === 0) rect(b, fr, x, y, 1, 1, lt); break;
+    case 'cloud': [[0, 1], [2, 3], [1, 6], [3, 8]].forEach(([x, y]) => { rect(b, fr, x, y, 1, 1, '#ffffff'); rect(b, os, x, y, 1, 1, '#ffffff'); }); break;
+    case 'redstone': [[1, 1], [3, 4], [0, 7]].forEach(([x, y]) => { rect(b, fr, x, y, 1, 1, '#ff3b2a'); rect(b, os, x, y + 1, 1, 1, '#ff3b2a'); }); rect(b, os, 0, 4, 4, 2, dk); break;
+    case 'gold': rect(b, fr, 0, 0, 4, 1, '#ffd23a'); rect(b, fr, 0, 4, 4, 1, lt); rect(b, os, 0, 4, 4, 1, lt); break;
+    case 'frost': for (let k = 0; k < 8; k++) rect(b, fr, Math.floor(rnd() * 4), Math.floor(rnd() * 9), 1, 1, '#ffffff'); rect(b, os, 1, 0, 2, 9, lt); break;
+    case 'jungle': rect(b, os, 0, 2, 4, 3, lt); rect(b, fr, 0, 6, 4, 1, dk); rect(b, os, 1, 3, 2, 1, dk); break;
+    case 'star': [[1, 1], [3, 4], [1, 7]].forEach(([x, y]) => { rect(b, fr, x, y, 1, 1, '#ffe56f'); rect(b, os, x, y, 1, 1, '#ffe56f'); }); break;
+    case 'mushroom': [[0, 2], [2, 5], [1, 8]].forEach(([x, y]) => { rect(b, fr, x, y, 2, 1, '#f4ead0'); rect(b, os, x + 1, y, 1, 1, '#f4ead0'); }); break;
+  }
+}
+
 function mcPaint(a) {
   const tone = AVATAR_TONES[a.tone] || AVATAR_TONES[0], girl = a.gender === 'girl', aw = girl ? 3 : 4;
   const shirt = avatarItem(a.shirt) || avatarItem('shirt-basic'), pants = avatarItem(a.pants) || avatarItem('pants-basic'), shoes = avatarItem(a.shoes) || avatarItem('shoes-basic'), hair = avatarItem(a.hair) || avatarItem('hair-boy-basic');
@@ -2136,7 +2237,7 @@ function mcPaint(a) {
   // skin on every part
   Object.keys(P).forEach(n => ALL.forEach(f => fill(b, P[n][f], tone.color, 4)));
   // ---- torso & sleeves ----
-  const sc = shirt.color, sid = shirt.id, short = SHORT_SLEEVE.includes(sid), pid = pants.id, pc = pants.color;
+  const sc = (shirt.id === 'shirt-basic' && girl) ? '#f27ab4' : shirt.color, sid = shirt.id, short = SHORT_SLEEVE.includes(sid) || /\b(tee|jersey|top|vest|overalls|shirt)\b/i.test(shirt.name) && !/hoodie|jacket/i.test(shirt.name), pid = pants.id, pc = pants.color;
   ['top', ...SIDES].forEach(f => fill(b, P.body[f], sc, 5));
   fill(b, P.body.bottom, pc, 4);
   SIDES.forEach(f => rect(b, P.body[f], 0, 10, P.body[f][2], 2, pc, 4));
@@ -2147,23 +2248,25 @@ function mcPaint(a) {
     SIDES.forEach(f => { const r = P[n][f]; rect(b, r, 0, 0, r[2], cover, sc, 5); rect(b, r, 0, cover - 1, r[2], 1, sh(sc, -24)); });
   });
   // ---- legs & shoes ----
-  const isShort = pid.includes('shorts'), isSkirt = pid.includes('skirt'), rows = isSkirt ? 4 : isShort ? 6 : 12;
+  const isShort = pid.includes('shorts') || /shorts/i.test(pants.name), isSkirt = girlSkirt(a), basicSkirt = girl && pid === 'pants-basic', rows = isSkirt ? 4 : isShort ? 6 : 12;
   ['rleg', 'lleg'].forEach(n => {
     fill(b, P[n].top, pc, 4);
     SIDES.forEach(f => { const r = P[n][f]; rect(b, r, 0, 0, r[2], rows, pc, 4); if (rows < 12 && !isSkirt) rect(b, r, 0, rows - 1, r[2], 1, sh(pc, -26)); });
+    if (isSkirt) SIDES.forEach(f => rect(b, P[n][f], 0, 6, P[n][f][2], 3, '#ffffff', 2));
     const os = P[n][n === 'rleg' ? 'right' : 'left'], fr = P[n].front;
     if (pid.includes('jogger')) { rect(b, os, 1, 0, 2, isShort ? rows : 9, sh(pc, 70)); rect(b, fr, 0, 8, 4, 1, sh(pc, -20)); }
+    if (pants.style && pid.includes('extra')) pantsArt(pants.style, b, fr, os, rect, pc, rnd, n);
     if (pid.includes('cargo')) { rect(b, os, 0, 3, 4, 3, sh(pc, 28)); rect(b, os, 1, 4, 2, 1, sh(pc, -18)); rect(b, fr, 0, 9, 4, 1, sh(pc, -18)); }
     if (pid.includes('leggings')) for (let k = 0; k < 8; k++) rect(b, P[n][SIDES[k % 4]], (k * 3) % 4, (k * 5) % 9, 1, 1, '#f8dd74');
     if (pid.includes('jeans')) { rect(b, fr, 0, 0, 4, 1, sh(pc, -30)); rect(b, fr, 2, 1, 1, 9, sh(pc, 36)); rect(b, fr, 0, 9, 4, 1, sh(pc, 28)); }
     SIDES.forEach(f => { const r = P[n][f]; rect(b, r, 0, 9, r[2], 3, shoes.color, 5); rect(b, r, 0, 11, r[2], 1, '#efe7d2'); });
-    fill(b, P[n].bottom, '#d9d0bb', 3); rect(b, fr, 1, 9, 2, 1, sh(shoes.color, -32));
+    fill(b, P[n].bottom, '#d9d0bb', 3); rect(b, fr, 1, 9, 2, 1, sh(shoes.color, -32)); rect(b, fr, 1, 10, 2, 1, '#ffffff'); rect(b, fr, 0, 11, 4, 1, '#efe7d2');
   });
   // ---- shirt artwork ----
   const F = P.body.front, Bk = P.body.back, Rm = P.rarm.front, Lm = P.larm.front;
   const flower = (x, y) => { rect(b, F, x + 1, y, 1, 1, '#fff2f2'); rect(b, F, x, y + 1, 3, 1, '#fff2f2'); rect(b, F, x + 1, y + 2, 1, 1, '#fff2f2'); rect(b, F, x + 1, y + 1, 1, 1, '#ffd54a'); };
   const STAR = ['..#..', '.###.', '#####', '.###.', '.#.#.'];
-  if (sid === 'shirt-basic') { pat(b, F, 1, 2, STAR, '#ffe56f'); rect(b, Bk, 3, 3, 2, 2, sh(sc, 26)); }
+  if (sid === 'shirt-basic') { if (girl) { pat(b, F, 1, 2, ['.#.#.', '#####', '#####', '.###.', '..#..'], '#fff0f6'); rect(b, F, 0, 9, 8, 1, '#ffffff'); rect(b, Bk, 2, 3, 4, 1, '#fff0f6'); } else { pat(b, F, 1, 2, STAR, '#ffe56f'); rect(b, Bk, 3, 3, 2, 2, sh(sc, 26)); } }
   else if (sid === 'shirt-boy-dino') { for (let i = 0; i < 8; i++) rect(b, F, i, 3 + (i % 2), 1, 1, '#d5ed83'); rect(b, F, 1, 7, 6, 1, '#d5ed83'); for (let i = 0; i < 8; i += 2) rect(b, Bk, i, 4, 1, 1, '#d5ed83'); }
   else if (sid === 'shirt-boy-soccer') { for (let x = 0; x < 8; x += 2) { rect(b, F, x, 0, 1, 10, '#d3d8ea'); rect(b, Bk, x, 0, 1, 10, '#d3d8ea'); } const nc = '#2b3a67'; rect(b, Bk, 2, 3, 1, 5, nc); rect(b, Bk, 4, 3, 3, 1, nc); rect(b, Bk, 4, 7, 3, 1, nc); rect(b, Bk, 4, 3, 1, 5, nc); rect(b, Bk, 6, 3, 1, 5, nc); }
   else if (sid === 'shirt-boy-robot') { rect(b, F, 2, 1, 4, 6, '#8fd4ee'); rect(b, F, 2, 2, 1, 2, '#2d3f6e'); rect(b, F, 5, 2, 1, 2, '#2d3f6e'); rect(b, F, 3, 5, 2, 1, '#ffd85e'); [Rm, Lm].forEach(r => rect(b, r, 0, 0, r[2], 3, '#3d5f8f')); rect(b, Bk, 2, 2, 4, 5, '#7fbfe0'); rect(b, Bk, 3, 4, 2, 1, '#ffd85e'); }
@@ -2174,22 +2277,21 @@ function mcPaint(a) {
   else if (sid === 'shirt-girl-denim') { rect(b, F, 3, 0, 2, 12, sh(sc, -26)); [2, 5, 8].forEach(y => rect(b, F, 3, y, 1, 1, '#f4d262')); rect(b, F, 0, 3, 2, 2, sh(sc, 24)); rect(b, F, 6, 3, 2, 2, sh(sc, 24)); }
   else if (sid === 'shirt-mint') { rect(b, F, 3, 0, 1, 12, '#e9fff5'); rect(b, F, 4, 0, 1, 12, sh(sc, -26)); rect(b, F, 3, 2, 1, 1, '#ffd85e'); rect(b, F, 1, 8, 2, 1, sh(sc, -26)); rect(b, F, 5, 8, 2, 1, sh(sc, -26)); }
   else if (sid === 'shirt-gold') { rect(b, F, 0, 0, 1, 10, '#fff'); rect(b, F, 7, 0, 1, 10, '#fff'); pat(b, F, 2, 3, ['#####', '.###.', '..#..', '.###.'], '#a63b2a'); rect(b, Bk, 3, 3, 1, 5, '#a63b2a'); rect(b, Bk, 2, 4, 1, 1, '#a63b2a'); ['rarm', 'larm'].forEach(n => SIDES.forEach(f => { const r = P[n][f]; rect(b, r, 0, 5, r[2], 1, '#fff'); })); }
+  else if (sid.includes('extra') && extraShirt(shirt.style, b, F, Bk, Rm, Lm, rect, pat, sc, rnd)) { }
   else if (sid.includes('extra')) { let seed=0; for(let q=0;q<sid.length;q++)seed=(seed*31+sid.charCodeAt(q))>>>0; const accent=sh(sc, seed%2?46:-38), mode=seed%4; if(mode===0){for(let y=1;y<11;y+=3)rect(b,F,0,y,8,1,accent);} else if(mode===1){rect(b,F,1,2,6,6,accent);rect(b,F,2,3,4,4,sh(sc,18));} else if(mode===2){for(let x=0;x<8;x+=2)rect(b,F,x,2+(x%3),1,5,accent);} else {for(let y=2;y<9;y+=3){rect(b,F,1,y,2,2,accent);rect(b,F,5,y,2,2,accent);}} rect(b,F,3,9,2,2,sh(sc,24)); } else { rect(b, F, 3, 3, 2, 2, sh(sc, 30)); }
   // overlay: raised hood/cuffs for jackets & hoodies
-  if (JACKETS.includes(sid)) {
+  if (JACKETS.includes(sid) || /hoodie|jacket|tunic|sweater|armor/i.test(shirt.name)) {
     rect(o, O.body.front, 1, 0, 6, 1, sh(sc, -14), 3); rect(o, O.body.back, 1, 0, 6, sid.includes('hoodie') ? 3 : 1, sh(sc, -18), 4);
     ['rarm', 'larm'].forEach(n => SIDES.forEach(f => { const r = O[n][f]; rect(o, r, 0, 8, r[2], 2, sh(sc, -12), 3); }));
     rect(o, O.body.front, 0, 10, 8, 2, sh(sc, -14), 3); rect(o, O.body.back, 0, 10, 8, 2, sh(sc, -14), 3);
   }
   // ---- face ----
-  const H = P.head.front, pup = girl ? '#3a2a63' : '#2c3e8f';
-  rect(b, H, 1, 3, 2, 1, sh(hair.color, -10)); rect(b, H, 5, 3, 2, 1, sh(hair.color, -10));
-  rect(b, H, 1, 4, 1, 1, '#ffffff'); rect(b, H, 2, 4, 1, 1, pup); rect(b, H, 5, 4, 1, 1, pup); rect(b, H, 6, 4, 1, 1, '#ffffff');
-  rect(b, H, 2, 5, 1, 1, sh(tone.color, -34)); rect(b, H, 5, 5, 1, 1, sh(tone.color, -34));
-  rect(b, H, 3, 5, 2, 1, sh(tone.color, -14));
-  rect(b, H, 3, 6, 2, 1, girl ? '#c4506a' : '#9a4a52');
-  if (girl) { rect(b, H, 0, 5, 1, 1, '#ef9a9a'); rect(b, H, 7, 5, 1, 1, '#ef9a9a'); rect(b, H, 1, 3, 1, 1, '#2a1d2e'); rect(b, H, 6, 3, 1, 1, '#2a1d2e'); }
-  else { rect(b, H, 1, 5, 1, 1, sh(tone.color, -8)); rect(b, H, 6, 5, 1, 1, sh(tone.color, -8)); }
+  const H = P.head.front, ink = '#2a1d2e', brow = sh(hair.color, -30);
+  const eye = side => { const wx = side < 0 ? 1 : 6, ix = side < 0 ? 2 : 5; rect(b, H, wx, 4, 1, 2, '#ffffff'); rect(b, H, ix, 4, 1, 2, girl ? '#8a5cf0' : '#3a78e0'); rect(b, H, ix, 4, 1, 1, girl ? '#d3c0ff' : '#9cc8ff'); rect(b, H, ix, 5, 1, 1, girl ? '#3a2a63' : '#16285f'); };
+  eye(-1); eye(1);
+  if (girl) { rect(b, H, 1, 3, 2, 1, ink); rect(b, H, 5, 3, 2, 1, ink); rect(b, H, 0, 4, 1, 1, ink); rect(b, H, 7, 4, 1, 1, ink); rect(b, H, 1, 6, 1, 1, '#f2a0b2'); rect(b, H, 6, 6, 1, 1, '#f2a0b2'); rect(b, H, 3, 6, 2, 1, '#d4506e'); rect(b, H, 2, 6, 1, 1, sh(tone.color, -16)); rect(b, H, 5, 6, 1, 1, sh(tone.color, -16)); }
+  else { rect(b, H, 1, 3, 2, 1, brow); rect(b, H, 5, 3, 2, 1, brow); rect(b, H, 2, 2, 1, 1, brow); rect(b, H, 5, 2, 1, 1, brow); rect(b, H, 3, 6, 2, 1, '#a24b52'); rect(b, H, 2, 6, 1, 1, sh(tone.color, -12)); rect(b, H, 5, 6, 1, 1, sh(tone.color, -12)); }
+  rect(b, H, 3, 5, 2, 1, sh(tone.color, -18));
   // ---- hair (overlay layer, bigger than the head so it has volume) ----
   const hc = hair.color, hs = hair.style, HO = O.head;
   const sr = ({ short: 3, spiky: 3, pony: 4, curly: 4, long: 7, braid: 7 })[hs] || 3, br = ({ short: 4, spiky: 4, pony: 5, curly: 6, long: 8, braid: 8 })[hs] || 4;
@@ -2209,6 +2311,21 @@ function mcPaint(a) {
     if (sr > 3) rect(o, r, f === 'right' ? 0 : 3, 3, 5, sr - 3, hc, 10);
   });
   rect(o, HO.back, 0, 0, 8, br, hc, 10);
+  // ---- pixel shading pass: top light, bottom shadow, soft cloth weave ----
+  const shadeAll = (ctx, parts) => {
+    const id = ctx.getImageData(0, 0, 64, 64), d = id.data;
+    Object.values(parts).forEach(pr => Object.keys(pr).forEach(face => {
+      const [x0, y0, w, h] = pr[face];
+      for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+        const k = ((y0 + j) * 64 + x0 + i) * 4; if (d[k + 3] < 10) continue;
+        let dl; if (face === 'top') dl = 14; else if (face === 'bottom') dl = -30; else { dl = 12 - (j / Math.max(1, h - 1)) * 26; if (face === 'left' || face === 'right') dl -= 8; if (face === 'back') dl -= 5; if (i === 0 || i === w - 1) dl -= 6; }
+        dl += ((x0 + i + y0 + j) & 1) ? 2 : -2;
+        d[k] = Math.max(0, Math.min(255, d[k] + dl)); d[k + 1] = Math.max(0, Math.min(255, d[k + 1] + dl)); d[k + 2] = Math.max(0, Math.min(255, d[k + 2] + dl));
+      }
+    }));
+    ctx.putImageData(id, 0, 0);
+  };
+  shadeAll(b, P); shadeAll(o, O);
   return { bc, oc, aw, hair };
 }
 
@@ -2219,7 +2336,7 @@ function miniURL(a) {
   const c = document.createElement('canvas'); c.width = 16; c.height = 38; const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
   const put = (src, sx, sy, w, h, dx, dy) => g.drawImage(src, sx, sy, w, h, dx, dy, w, h);
   const layers = [bc, oc];
-  const pants = avatarItem(a.pants), isSkirt = pants && pants.id.includes('skirt');
+  const pants = avatarItem(a.pants), isSkirt = girlSkirt(a);
   layers.forEach((L, k) => {
     put(L, 4, 20, 4, 12, 4, 26); put(L, 20, 52, 4, 12, 8, 26);
     if (k) { put(L, 4, 36, 4, 12, 4, 26); put(L, 4, 52, 4, 12, 8, 26); }
@@ -2232,6 +2349,10 @@ function miniURL(a) {
   if (hair.style === 'spiky') { g.fillStyle = hair.color; [4, 6, 8, 10].forEach((x, i) => g.fillRect(x, 5 - (i % 2), 2, 1 + (i % 2))); }
   if (hair.style === 'curly') { g.fillStyle = hair.color; g.fillRect(3, 5, 10, 2); }
   if (hair.style === 'pony') { g.fillStyle = hair.color; g.fillRect(12, 6, 2, 5); }
+  if (hair.style === 'mohawk') { g.fillStyle = hair.color; g.fillRect(7, 3, 2, 3); }
+  if (hair.style === 'afro') { g.fillStyle = hair.color; g.fillRect(2, 4, 2, 8); g.fillRect(12, 4, 2, 8); g.fillRect(3, 2, 10, 3); }
+  if (hair.style === 'bun') { g.fillStyle = hair.color; g.fillRect(6, 3, 4, 3); }
+  if (hair.style === 'bob' || hair.style === 'sweep') { g.fillStyle = hair.color; g.fillRect(3, 7, 1, 6); g.fillRect(12, 7, 1, 6); }
   const R = (x, y, w, h, col, al) => { g.globalAlpha = al == null ? 1 : al; g.fillStyle = col; g.fillRect(x, y, w, h); g.globalAlpha = 1; };
   const hat = a.hat, bag = avatarItem(a.backpack), acc = a.accessory || '';
   if (bag) { R(5, 14, 1, 7, bag.color || '#4388d7'); R(10, 14, 1, 7, bag.color || '#4388d7'); }
@@ -2245,6 +2366,13 @@ function miniURL(a) {
     else if (hat.includes('dino')) { R(4, 4, 8, 3, hc2); R(5, 2, 1, 2, '#b9df77'); R(8, 2, 1, 2, '#b9df77'); R(11, 4, 1, 1, '#b9df77'); }
     else if (hat.includes('space')) { R(3, 4, 10, 11, '#bff4ff', .3); R(3, 4, 10, 1, '#fff'); R(3, 14, 10, 1, '#fff'); R(3, 4, 1, 11, '#fff'); R(12, 4, 1, 11, '#fff'); }
     else if (hat.includes('sun')) { R(4, 4, 8, 3, hc2); R(2, 7, 12, 1, sh(hc2, -40)); R(4, 6, 8, 1, '#d8473a'); }
+    else if (hat.includes('knight')) { R(4, 3, 8, 5, hc2); R(5, 6, 6, 1, '#10131c'); R(7, 2, 2, 1, '#d8473a'); }
+    else if (hat.includes('mushroom')) { R(3, 4, 10, 3, hc2); R(5, 3, 6, 1, hc2); R(5, 4, 1, 1, '#fff'); R(9, 5, 1, 1, '#fff'); }
+    else if (hat.includes('creeper')) { R(4, 3, 8, 5, hc2); R(5, 4, 2, 2, '#111'); R(9, 4, 2, 2, '#111'); R(7, 6, 2, 2, '#111'); }
+    else if (hat.includes('pirate')) { R(3, 5, 10, 2, hc2); R(5, 3, 6, 2, hc2); R(7, 4, 2, 1, '#fff'); }
+    else if (hat.includes('fox')) { R(4, 5, 8, 2, hc2); R(4, 3, 2, 2, hc2); R(10, 3, 2, 2, hc2); }
+    else if (hat.includes('bee')) { R(4, 5, 8, 2, hc2); R(5, 2, 1, 3, '#222'); R(10, 2, 1, 3, '#222'); }
+    else { R(4, 4, 8, 3, hc2); R(3, 7, 10, 1, sh(hc2, -34)); }
   }
   if (acc.includes('glasses')) { R(5, 10, 3, 2, '#ff6ad5', .75); R(9, 10, 3, 2, '#56d8ff', .75); R(8, 10, 1, 1, '#ffe66d'); }
   else if (acc.includes('shades')) { R(5, 10, 3, 2, '#1d2233'); R(9, 10, 3, 2, '#1d2233'); R(8, 10, 1, 1, '#1d2233'); }
@@ -2256,7 +2384,11 @@ function miniURL(a) {
   else if (acc.includes('camera')) { R(9, 21, 4, 3, '#2b2f3f'); R(10, 22, 2, 1, '#9cd8ff'); }
   else if (acc.includes('butterfly')) { R(9, 17, 3, 2, '#7a8cff'); R(10, 17, 1, 2, '#2b2f3f'); }
   else if (acc.includes('lightning')) { R(10, 17, 1, 1, '#ffe56f'); R(9, 18, 2, 1, '#ffe56f'); R(9, 19, 1, 1, '#ffe56f'); }
-  return c.toDataURL();
+  else if (acc) { const ai = avatarItem(a.accessory), ac = (ai && ai.color) || '#f3c84c'; R(9, 17, 3, 3, ac); R(10, 18, 1, 1, '#fff4cf'); }
+  const o = document.createElement('canvas'); o.width = 18; o.height = 40; const og = o.getContext('2d'); og.imageSmoothingEnabled = false;
+  const tmp = document.createElement('canvas'); tmp.width = 18; tmp.height = 40; const tg = tmp.getContext('2d'); tg.drawImage(c, 1, 1); tg.globalCompositeOperation = 'source-in'; tg.fillStyle = '#1a1530'; tg.fillRect(0, 0, 18, 40);
+  [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([x, y]) => og.drawImage(tmp, x, y)); og.drawImage(c, 1, 1);
+  return o.toDataURL();
 }
 function minecraftMini(s) {
   const a = avatarData(s), key = lookKey(a); let url = miniCache.get(key);
@@ -2292,15 +2424,16 @@ function buildPerson(a) {
   const { bc, oc, aw } = mcPaint(a), tb = mkTex(bc), to = mkTex(oc), own = [];
   const L = (col, o) => { const m = new THREE.MeshLambertMaterial(Object.assign({ color: hexN(col) }, o || {})); own.push(m); return m; };
   const mb = new THREE.MeshLambertMaterial({ map: tb }), mo = new THREE.MeshLambertMaterial({ map: to, transparent: true, alphaTest: .5 }); own.push(mb, mo);
-  const G = new THREE.Group(), P = {};
+  const G = new THREE.Group(), P = {}, OLM = new THREE.MeshBasicMaterial({ color: 0x1a1530, side: THREE.BackSide }); own.push(OLM);
   const bx = (par, w, h, d, x, y, z, col, o) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), L(col, o)); m.position.set(x, y, z); par.add(m); return m; };
-  const part = (name, w, h, d, u, v, ou, ov, px, py, cy) => { const pv = new THREE.Group(); pv.position.set(px, py, 0); const m = new THREE.Mesh(mcBox(w, h, d, u, v, 0), mb), m2 = new THREE.Mesh(mcBox(w, h, d, ou, ov, .28), mo); m.position.y = m2.position.y = cy; pv.add(m, m2); G.add(pv); P[name] = pv; return pv; };
-  part('body', 8, 12, 4, 16, 16, 16, 32, 0, 18, 0);
-  const head = part('head', 8, 8, 8, 0, 0, 32, 0, 0, 24, 4);
-  part('rarm', aw, 12, 4, 40, 16, 40, 32, -(4 + aw / 2), 22, -4);
-  part('larm', aw, 12, 4, 32, 48, 48, 48, 4 + aw / 2, 22, -4);
-  part('rleg', 4, 12, 4, 0, 16, 0, 32, -2, 12, -6);
-  part('lleg', 4, 12, 4, 16, 48, 0, 48, 2, 12, -6);
+  const part = (name, w, h, d, u, v, ou, ov, px, py, cy) => { const pv = new THREE.Group(); pv.position.set(px, py, 0); const m = new THREE.Mesh(mcBox(w, h, d, u, v, 0), mb), m2 = new THREE.Mesh(mcBox(w, h, d, ou, ov, .28), mo); const ol = new THREE.Mesh(new THREE.BoxGeometry(w + 1.2, h + 1.2, d + 1.2), OLM); m.position.y = m2.position.y = ol.position.y = cy; pv.add(ol, m, m2); G.add(pv); P[name] = pv; return pv; };
+  const girl = a.gender === 'girl', ax = (girl ? 3.5 : 4.25) + aw / 2, lx = girl ? 1.8 : 2.1;
+  part('body', 8, 12, 4, 16, 16, 16, 32, 0, 18, 0).scale.x = girl ? .88 : 1.06;
+  const head = part('head', 8, 8, 8, 0, 0, 32, 0, 0, 24, 4); head.scale.setScalar(girl ? 1.08 : 1);
+  part('rarm', aw, 12, 4, 40, 16, 40, 32, -ax, 22, -4);
+  part('larm', aw, 12, 4, 32, 48, 48, 48, ax, 22, -4);
+  part('rleg', 4, 12, 4, 0, 16, 0, 32, -lx, 12, -6);
+  part('lleg', 4, 12, 4, 16, 48, 0, 48, lx, 12, -6);
   const it = k => avatarItem(a[k]), hairI = it('hair'), shoes = it('shoes'), pants = it('pants');
   const hb = (...r) => bx(head, ...r), hc = hairI.color, hs = hairI.style;
   const glow = c => ({ emissive: hexN(c), emissiveIntensity: .55 });
@@ -2313,6 +2446,7 @@ function buildPerson(a) {
   if (hs === 'bun') { hb(4.6, 3.4, 4.6, 0, 8.6, -1.8, hc); hb(2.4, 2.2, 2.4, 0, 10.8, -1.8, sh(hc, 15)); }
   if (hs === 'mohawk') { hb(2.4, 5.4, 4.2, 0, 9.2, 0, hc); hb(2.4, 2.2, 4.2, 0, 12.8, 0, sh(hc, 18)); }
   if (hs === 'bob' || hs === 'sweep') { hb(8.9, 6.6, 1.5, 0, 6.4, -5.05, hc); hb(2, 6.8, 2.2, hs === 'sweep' ? 4.2 : -4.1, 2.5, -4.8, hc); }
+  if (girl && !a.hat && hs !== 'pony') { hb(1.9, 1.9, 1.3, 2.3, 8.2, 1.4, '#ff6eaa'); hb(1.9, 1.9, 1.3, 4.5, 8.2, 1.4, '#ff6eaa'); hb(1.1, 1.1, 1.5, 3.4, 8.2, 1.4, '#ffe78a'); }
   /* hats */
   const hat = a.hat;
   if (hat) {
@@ -2353,13 +2487,14 @@ function buildPerson(a) {
     if (bid.includes('wings')) { bx(G, 1.6, 6, 3, -4.6, 17, back, '#d8473a'); bx(G, 1.6, 6, 3, 4.6, 17, back, '#d8473a'); bx(G, 4.4, 2.6, 3.2, 0, 14.4, back, '#cfd8e8'); bx(G, 3, 2.4, 2.4, 0, 12.4, back, '#ffb02e', glow('#ffb02e')); bx(G, 1.6, 1.6, 1.6, 0, 11, back, '#fff1a8', glow('#fff1a8')); }
   }
   /* skirt, shoes */
-  if (pants.id.includes('skirt')) { bx(G, 8.8, 2.4, 4.8, 0, 11.4, 0, pants.color); bx(G, 10.6, 2.6, 6.2, 0, 9, 0, pants.color); bx(G, 10.8, .6, 6.4, 0, 7.7, 0, sh(pants.color, 40)); }
-  [-2, 2].forEach(sx => {
-    bx(G, 4.1, 2.4, 1.6, sx, 1.2, 2.7, shoes.color); bx(G, 4.3, .5, 1.8, sx, .25, 2.7, '#efe7d2');
-    if (shoes.id.includes('high')) bx(G, 4.3, 2.2, 4.3, sx, 3.4, 0, shoes.color);
-    if (shoes.id.includes('rocket')) { bx(G, 1.6, 1.6, 1.4, sx, 1.4, -2.9, '#ffb02e', glow('#ffb02e')); bx(G, .9, .9, .9, sx, 1.2, -3.8, '#fff1a8', glow('#fff1a8')); }
-    if (shoes.id.includes('star')) bx(G, 1.4, 1.4, .3, sx, 1.7, 3.55, '#ffe56f', glow('#ffe56f'));
-    if (shoes.id.includes('rainbow')) ['#ff5a5a', '#ffe66d', '#56a8ff'].forEach((c, i) => bx(G, 4.2, .5, .3, sx, 2.1 - i * .6, 3.55, c));
+  if (girlSkirt(a)) { bx(G, 7.5, 2.4, 4.8, 0, 11.4, 0, pants.color); bx(G, 9.4, 2.6, 6.2, 0, 9, 0, pants.color); bx(G, 9.6, .6, 6.4, 0, 7.7, 0, sh(pants.color, 40)); }
+  [-1, 1].forEach(sd => {
+    const LP = sd < 0 ? P.rleg : P.lleg, sb = (w, h, d, x, y, z, c, o) => bx(LP, w, h, d, x, y - 12, z, c, o);
+    sb(4.1, 2.4, 1.6, 0, 1.2, 2.7, shoes.color); sb(4.3, .5, 1.8, 0, .25, 2.7, '#efe7d2');
+    if (shoes.id.includes('high')) sb(4.3, 2.2, 4.3, 0, 3.4, 0, shoes.color);
+    if (shoes.id.includes('rocket')) { sb(1.6, 1.6, 1.4, 0, 1.4, -2.9, '#ffb02e', glow('#ffb02e')); sb(.9, .9, .9, 0, 1.2, -3.8, '#fff1a8', glow('#fff1a8')); }
+    if (shoes.id.includes('star')) sb(1.4, 1.4, .3, 0, 1.7, 3.55, '#ffe56f', glow('#ffe56f'));
+    if (shoes.id.includes('rainbow')) ['#ff5a5a', '#ffe66d', '#56a8ff'].forEach((c, i) => sb(4.2, .5, .3, 0, 2.1 - i * .6, 3.55, c));
   });
   return { G, P, mb, mo, own, tex: [tb, to] };
 }
@@ -2371,8 +2506,31 @@ function disposePerson(p) {
 /* =============================================================
    3D STAGE (single renderer — outfits swap without reload)
    ============================================================= */
+const sn = Math.sin, PI = Math.PI;
+const DANCES = {
+  floss: { n: 'Floss', e: '🕺', f: (b, P, G) => { const s = sn(b * PI * 2); P.rarm.rotation.x = P.larm.rotation.x = .9; P.rarm.rotation.z = s * 1.1; P.larm.rotation.z = s * 1.1; G.position.x = -s * 2.2; G.rotation.z = s * .1; P.head.rotation.z = -s * .12; G.position.y = Math.abs(sn(b * PI * 2)) * .4; } },
+  dab: { n: 'Dab', e: '😎', f: (b, P, G) => { const ph = b % 2, p = ph < .25 ? ph / .25 : ph < 1.5 ? 1 : (2 - ph) / .5; P.larm.rotation.z = 2.5 * p; P.rarm.rotation.x = -1.75 * p; P.rarm.rotation.z = .9 * p; P.head.rotation.x = .55 * p; P.head.rotation.y = -.5 * p; G.rotation.y = -.2 * p; } },
+  disco: { n: 'Disco', e: '🪩', f: (b, P, G) => { const d = (Math.floor(b / 2) % 2) ? 1 : -1, sw = sn(b * PI); const up = 2.4 + sn(b * PI * 4) * .12; if (d > 0) { P.rarm.rotation.z = -up; P.larm.rotation.z = .5; } else { P.larm.rotation.z = up; P.rarm.rotation.z = -.5; } G.position.x = sw * 1.7; G.rotation.z = sw * .12; P.head.rotation.z = d * .2; P.rleg.rotation.z = -.15; P.lleg.rotation.z = .15; G.position.y = Math.abs(sw) * .3; } },
+  robot: { n: 'Robot', e: '🤖', f: (b, P, G) => { const i = Math.floor(b) % 4, j = Math.floor(b * 2) % 2; if (i === 0) { P.rarm.rotation.x = P.larm.rotation.x = -1.57; P.head.rotation.y = .5; } else if (i === 1) { P.rarm.rotation.z = -1.57; P.larm.rotation.z = 1.57; P.head.rotation.y = -.5; } else if (i === 2) { P.rarm.rotation.z = -2.4; P.larm.rotation.x = -1.57; P.head.rotation.y = .5; } else { P.larm.rotation.z = 2.4; P.rarm.rotation.x = -1.57; P.head.rotation.y = -.5; } P.rleg.rotation.x = j ? -.5 : 0; P.lleg.rotation.x = j ? 0 : -.5; G.rotation.y = (Math.floor(b * 2) % 2 ? .3 : -.3); } },
+  chicken: { n: 'Chicken', e: '🐔', f: (b, P, G) => { const f = sn(b * PI * 4), c = sn(b * PI * 2); P.rarm.rotation.z = -1.1 - f * .5; P.larm.rotation.z = 1.1 + f * .5; P.rarm.rotation.x = P.larm.rotation.x = -.2; P.head.position.z = c * 1.4; P.head.rotation.x = c * .35; P.rleg.rotation.x = -Math.max(0, c) * .8; P.lleg.rotation.x = -Math.max(0, -c) * .8; G.position.y = Math.abs(c) * .6; } },
+  sprinkler: { n: 'Sprinkler', e: '💦', f: (b, P, G) => { const i = Math.floor((b % 4) * 2); G.rotation.y = -.7 + i * .2; P.rarm.rotation.z = -2.7; P.rarm.rotation.x = -.4; P.larm.rotation.z = 1.57 + sn(b * PI * 16) * .05; P.rleg.rotation.z = -.15; P.lleg.rotation.z = .15; G.position.y = Math.abs(sn(b * PI * 2)) * .3; } },
+  tpose: { n: 'T-Pose', e: '🧍', f: (b, P, G) => { P.rarm.rotation.z = -1.57; P.larm.rotation.z = 1.57; G.position.y = .2 + sn(b * .5) * .12; G.rotation.y = sn(b * .25) * .12; } },
+  moon: { n: 'Moonwalk', e: '🌙', f: (b, P, G) => { const s = sn(b * PI); G.position.x = sn(b * .5) * 3.2; G.rotation.y = .5; P.rleg.rotation.x = s * .6; P.lleg.rotation.x = -s * .6; P.rarm.rotation.z = -2.2 + s * .1; P.larm.rotation.z = .2; P.head.rotation.z = .1; G.position.y = Math.abs(s) * .15; } },
+  bang: { n: 'Headbang', e: '🎸', f: (b, P, G) => { const s = sn(b * PI * 2); P.head.rotation.x = .35 + s * .75; P.rarm.rotation.z = -2.5; P.larm.rotation.z = 2.5; P.rarm.rotation.x = -s * .2; P.larm.rotation.x = -s * .2; G.position.y = Math.abs(s) * .8; G.rotation.x = s * .06; P.rleg.rotation.x = .2 * s; P.lleg.rotation.x = -.2 * s; } },
+  griddy: { n: 'Griddy', e: '🏈', f: (b, P, G) => { const s = sn(b * PI * 2); P.rarm.rotation.z = -1 + s * .5; P.larm.rotation.z = 1 - s * .5; P.rleg.rotation.z = -Math.max(0, s) * .45; P.lleg.rotation.z = Math.max(0, -s) * .45; G.position.x = s * 1.4; G.position.y = Math.abs(s) * .6; G.rotation.z = s * .08; P.head.rotation.z = -s * .15; } },
+  naruto: { n: 'Naruto Run', e: '🍥', f: (b, P, G) => { const s = sn(b * PI * 4); P.rarm.rotation.x = P.larm.rotation.x = 1.3; P.rarm.rotation.z = -.15; P.larm.rotation.z = .15; G.rotation.x = .55; P.head.rotation.x = -.25; P.rleg.rotation.x = -s; P.lleg.rotation.x = s; G.position.y = Math.abs(s) * .5; } },
+  takeL: { n: 'Take the L', e: '🦵', f: (b, P, G) => { const al = sn(b * PI * .5), a = Math.max(0, al), c = Math.max(0, -al), s = sn(b * PI); P.larm.rotation.z = .045 + 2.05 * a; P.rarm.rotation.z = -.045 - 2.05 * c; P.larm.rotation.x = P.rarm.rotation.x = -.5 * Math.max(a, c); P.lleg.rotation.x = -.5 * Math.max(0, s); P.rleg.rotation.x = -.5 * Math.max(0, -s); G.position.y = Math.abs(s) * .5; G.rotation.z = al * .06; } },
+  orange: { n: 'Orange Justice', e: '🧡', f: (b, P, G) => { const q = b * PI * 1.6, s = sn(b * PI); P.larm.rotation.z = .5 + sn(q) * .9; P.rarm.rotation.z = -.5 + sn(q + 2.1) * .9; P.larm.rotation.x = Math.cos(q) * .6; P.rarm.rotation.x = -Math.cos(q + 2.1) * .6; P.lleg.rotation.x = s * .5; P.rleg.rotation.x = -s * .5; G.rotation.z = s * .1; G.position.y = Math.abs(s) * .45; P.head.rotation.z = -s * .1; } },
+  shuffle: { n: 'Electro Shuffle', e: '⚡', f: (b, P, G) => { const s = sn(b * PI * 2); P.larm.rotation.z = .6 + s * .7; P.rarm.rotation.z = -.6 - s * .7; P.larm.rotation.x = P.rarm.rotation.x = .5; P.lleg.rotation.x = s * .55; P.rleg.rotation.x = -s * .55; G.position.x = s * 1.1; G.rotation.z = s * .08; G.position.y = Math.abs(s) * .3; } },
+  bestm: { n: 'Best Mates', e: '🏃', f: (b, P, G) => { const s = sn(b * PI), al = sn(b * PI * .5); P.larm.rotation.z = .7 + s * .8; P.rarm.rotation.z = -.7 - s * .8; P.larm.rotation.x = al * .8; P.rarm.rotation.x = -al * .8; P.lleg.rotation.x = al * .7; P.rleg.rotation.x = -al * .7; G.position.y = Math.abs(s) * .4; P.head.rotation.y = al * .25; } },
+  twirl: { n: 'Twirl', e: '🌀', f: (b, P, G) => { G.rotation.y = b * PI * 1.8; P.rarm.rotation.z = -1.4; P.larm.rotation.z = 1.4; G.position.y = Math.abs(sn(b * PI)) * 2.4; P.rleg.rotation.x = -.3; P.lleg.rotation.x = .3; } }
+};
+const DKEYS = Object.keys(DANCES);
+function resetPose(P, G) { for (const k in P) P[k].rotation.set(0, 0, 0); P.head.position.set(0, 24, 0); G.position.set(0, 0, 0); G.rotation.set(0, 0, 0); }
+const danceHTML = () => DKEYS.map(k => `<button type="button" class="mcx-dbtn ${S && S.dance === k ? 'on' : ''}" aria-pressed="${!!(S && S.dance === k)}" onclick="mcxDance('${k}')"><i>${DANCES[k].e}</i><span>${DANCES[k].n}</span></button>`).join('') + `<button type="button" class="mcx-dbtn" onclick="mcxDance('random')"><i>🎲</i><span>Random</span></button>`;
 let S = null;
 function destroy3D() {
+  beat.stop(); if (S) clearTimeout(S.cmpT);
   if (!S) return;
   cancelAnimationFrame(S.raf); clearTimeout(S.hoverT);
   try {
@@ -2396,9 +2554,9 @@ window.initAvatar3DPreview = function () {
 };
 function start3D(host, stage) {
   const hi = (navigator.hardwareConcurrency || 4) > 4;
-  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: hi, powerPreference: 'high-performance' });
+  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, hi ? 2 : 1.25)); renderer.outputEncoding = THREE.sRGBEncoding;
-  const cv = renderer.domElement; cv.className = 'mcx-cv'; host.replaceChildren(cv);
+  const cv = renderer.domElement; cv.className = 'mcx-cv'; cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', '3D preview of your avatar. Drag to rotate.'); host.replaceChildren(cv);
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(32, 1, 1, 500), world = new THREE.Group(); scene.add(world);
   scene.add(new THREE.HemisphereLight(0xffffff, 0x6d7d5d, .98));
   const sun = new THREE.DirectionalLight(0xfff0d0, .7); sun.position.set(-30, 55, 40); scene.add(sun);
@@ -2413,7 +2571,7 @@ function start3D(host, stage) {
   const sc = document.createElement('canvas'); sc.width = sc.height = 64; const sg = sc.getContext('2d'), gr = sg.createRadialGradient(32, 32, 2, 32, 32, 30); gr.addColorStop(0, 'rgba(0,0,0,.45)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); sg.fillStyle = gr; sg.fillRect(0, 0, 64, 64);
   const shadow = new THREE.Mesh(new THREE.PlaneGeometry(14, 10), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sc), transparent: true, depthWrite: false })); shadow.rotation.x = -Math.PI / 2; shadow.position.y = .05; world.add(shadow);
   const reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  S = { renderer, scene, camera, world, host, stage, person: null, sig: '', yaw: -.5, auto: !reduced, zoom: 1, last: performance.now(), lastInt: -9999, wave: 0, dance:null, danceUntil:0, danceStart:0, fx: { t: 1, flash: 0 }, particles: [], pgeo: new THREE.BoxGeometry(1, 1, 1), pmats: {}, goYaw: null, dragging: false, dragX: 0, hover: null, hoverT: 0, t: 0, raf: 0 };
+  S = { renderer, scene, camera, world, host, stage, person: null, sig: '', yaw: -.5, auto: !reduced, zoom: 1, last: performance.now(), lastInt: -9999, wave: 0, fy: 17.5, fz: 1, tfy: 17.5, tfz: 1, focusT: 0, dance: null, danceT0: 0, cmp: false, cmpT: 0, prevA: null, realA: null, rings: [], fx: { t: 1, flash: 0 }, particles: [], pgeo: new THREE.BoxGeometry(1, 1, 1), pmats: {}, goYaw: null, dragging: false, dragX: 0, hover: null, hoverT: 0, t: 0, raf: 0 };
   const fit = () => { const w = host.clientWidth || 420, h = host.clientHeight || 460; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); };
   S.ro = new ResizeObserver(fit); S.ro.observe(host); fit();
   cv.addEventListener('pointerdown', e => { S.dragging = true; S.dragX = e.clientX; S.goYaw = null; S.lastInt = performance.now(); try { cv.setPointerCapture(e.pointerId); } catch (x) {} });
@@ -2435,13 +2593,19 @@ function start3D(host, stage) {
     if (S.fx.t < 1) { S.fx.t = Math.min(1, S.fx.t + dt / .9); const k = 1 - Math.pow(1 - S.fx.t, 3); spin = Math.PI * 2 * k; pop = 1 + .09 * Math.sin(Math.PI * S.fx.t); }
     world.rotation.y = S.yaw + spin; p.G.scale.setScalar(pop);
     if (S.fx.flash > 0) { S.fx.flash = Math.max(0, S.fx.flash - dt * 2.2); const v = S.fx.flash * .6; p.mb.emissive.setRGB(v, v, v); p.mo.emissive.setRGB(v, v, v); }
-    const P = p.P; P.head.rotation.y = Math.sin(t * .7) * .16; P.head.rotation.x = Math.sin(t * .9) * .035; P.head.position.y = 24 + Math.sin(t * 2.2) * .1;
-    P.larm.rotation.x = -Math.sin(t * 1.3) * .07; P.larm.rotation.z = .045; P.rarm.rotation.x = Math.sin(t * 1.3) * .07; P.rarm.rotation.z = -.045; P.lleg.rotation.x=0;P.rleg.rotation.x=0;
-    if (S.wave > 0) { S.wave -= dt; P.rarm.rotation.x = 0; P.rarm.rotation.z = -(2.45 + Math.sin(t * 13) * .28); }
-    if(S.dance&&ts>S.danceUntil)S.dance=null; if(S.dance){const fade=Math.max(0,Math.min(1,(ts-S.danceStart)/280,(S.danceUntil-ts)/420)),phase=(ts-S.danceStart)*.0065,sw=Math.sin(phase),alt=Math.sin(phase*.5),bob=Math.abs(sw)*.09*fade;p.G.position.y=bob;p.G.rotation.z=0;P.head.rotation.y+=sw*.045*fade;P.lleg.rotation.x=sw*.14*fade;P.rleg.rotation.x=-sw*.14*fade;P.larm.rotation.x=sw*.20*fade;P.rarm.rotation.x=-sw*.20*fade;if(S.dance==='floss'){P.larm.rotation.z=.045+sw*.52*fade;P.rarm.rotation.z=-.045-sw*.52*fade;p.G.rotation.z=sw*.035*fade;}else if(S.dance==='takeL'){const a=Math.max(0,Math.sin(phase*.5)),b=Math.max(0,-Math.sin(phase*.5));P.larm.rotation.z=.045+2.05*a*fade;P.rarm.rotation.z=-.045-2.05*b*fade;P.lleg.rotation.x=-.14*fade+Math.max(0,sw)*.28*fade;P.rleg.rotation.x=.14*fade+Math.max(0,-sw)*.28*fade;}else if(S.dance==='orange'){P.larm.rotation.z=.045+Math.sin(phase*1.6)*.40*fade;P.rarm.rotation.z=-.045+Math.sin(phase*1.6+2.1)*.40*fade;P.larm.rotation.x+=Math.cos(phase*1.6)*.16*fade;P.rarm.rotation.x-=Math.cos(phase*1.6+2.1)*.16*fade;p.G.rotation.z=sw*.045*fade;}else if(S.dance==='shuffle'){P.larm.rotation.z=.045+sw*.34*fade;P.rarm.rotation.z=-.045-sw*.34*fade;P.lleg.rotation.x=sw*.25*fade;P.rleg.rotation.x=-sw*.25*fade;p.G.rotation.z=sw*.04*fade;}else if(S.dance==='bestm'){P.larm.rotation.z=.045+sw*.36*fade;P.rarm.rotation.z=-.045-sw*.36*fade;P.lleg.rotation.x=alt*.24*fade;P.rleg.rotation.x=-alt*.24*fade;P.larm.rotation.x+=alt*.20*fade;P.rarm.rotation.x-=alt*.20*fade;}}else{p.G.position.y=0;p.G.rotation.z=0;P.lleg.rotation.x=0;P.rleg.rotation.x=0;}
+    const P = p.P, G = p.G; resetPose(P, G);
+    if (S.dance && DANCES[S.dance]) DANCES[S.dance].f((t - S.danceT0) * 2, P, G);
+    else {
+      P.head.rotation.y = sn(t * .7) * .16; P.head.rotation.x = sn(t * .9) * .035; P.head.position.y = 24 + sn(t * 2.2) * .1;
+      P.larm.rotation.x = -sn(t * 1.3) * .07; P.larm.rotation.z = .045; P.rarm.rotation.x = sn(t * 1.3) * .07; P.rarm.rotation.z = -.045;
+      if (S.wave > 0) { S.wave -= dt; P.rarm.rotation.x = 0; P.rarm.rotation.z = -(2.45 + sn(t * 13) * .28); }
+    }
     for (let i = S.particles.length - 1; i >= 0; i--) { const q = S.particles[i]; q.life -= dt; if (q.life <= 0) { S.scene.remove(q.m); S.particles.splice(i, 1); continue; } q.vy -= 38 * dt; q.m.position.x += q.vx * dt; q.m.position.y += q.vy * dt; q.m.position.z += q.vz * dt; q.m.rotation.x += dt * 6; q.m.rotation.y += dt * 5; q.m.scale.setScalar(q.s * Math.min(1, q.life * 1.6)); }
-    const asp = camera.aspect, dist = 96 * S.zoom * (asp < .95 ? (.95 / asp) * .96 : 1);
-    camera.position.set(0, 21, dist); camera.lookAt(0, 17.5, 0);
+    for (let i = S.rings.length - 1; i >= 0; i--) { const r = S.rings[i]; r.age += dt; const k = r.age / .8; if (k >= 1) { S.world.remove(r.m); r.m.geometry.dispose(); r.m.material.dispose(); S.rings.splice(i, 1); continue; } r.m.scale.setScalar(1 + k * 5); r.m.material.opacity = .9 * (1 - k); }
+    if (S.focusT > 0) { S.focusT -= dt; if (S.focusT <= 0) { S.tfy = 17.5; S.tfz = 1; } }
+    const kf = Math.min(1, dt * 4); S.fy += (S.tfy - S.fy) * kf; S.fz += (S.tfz - S.fz) * kf;
+    const asp = camera.aspect, dist = 96 * S.zoom * S.fz * (asp < .95 ? (.95 / asp) * .96 : 1);
+    camera.position.set(0, S.fy + 3.5, dist); camera.lookAt(0, S.fy, 0);
     renderer.render(scene, camera);
   };
   S.raf = requestAnimationFrame(loop);
@@ -2455,16 +2619,31 @@ function burst(col) {
     S.particles.push({ m, vx: Math.cos(a) * sp, vy: 8 + Math.random() * 16, vz: Math.sin(a) * sp, life: .9 + Math.random() * .6, s });
   }
 }
+function ring(col) {
+  if (!S) return; const m = new THREE.Mesh(new THREE.RingGeometry(2.5, 3.4, 4), new THREE.MeshBasicMaterial({ color: hexN(col), transparent: true, opacity: .9, side: THREE.DoubleSide, depthWrite: false }));
+  m.rotation.x = -PI / 2; m.rotation.z = PI / 4; m.position.y = .2; S.world.add(m); S.rings.push({ m, age: 0 });
+}
+const FOCUS = { hat: [27, .5], hair: [27, .5], accessory: [24, .6], shirt: [19, .7], backpack: [20, .7], pants: [10, .7], shoes: [3, .55], body: [17.5, .85] };
+function focusOn(slot) { const f = FOCUS[slot] || FOCUS.body; S.tfy = f[0]; S.tfz = f[1]; S.focusT = 1.9; }
+function showPop(html) {
+  const st = document.getElementById('mcx-stage'); if (!st) return; const old = st.querySelector('.mcx-pop'); if (old) old.remove();
+  const d = document.createElement('div'); d.className = 'mcx-pop'; d.setAttribute('role', 'status'); d.innerHTML = html; st.appendChild(d); setTimeout(() => d.remove(), 2750);
+}
 function syncPerson(kind, item, force) {
   if (!S) return; const s = activeStudent(); if (!s) return;
-  const a = lookWith(s, S.hover || avatarPreviewItem), sig = lookKey(a);
+  const real = lookWith(s, null); let changed = false;
+  if (!S.realA) S.realA = real; else if (lookKey(real) !== lookKey(S.realA)) { S.prevA = S.realA; S.realA = real; changed = true; }
+  const a = (S.cmp && S.prevA) ? S.prevA : lookWith(s, S.hover || avatarPreviewItem), sig = lookKey(a);
   if (!force && !kind && sig === S.sig) return;
   S.sig = sig;
   const np = buildPerson(a);
   if (S.person) { S.world.remove(S.person.G); disposePerson(S.person); }
   S.person = np; S.world.add(np.G);
-  if (kind === 'equip') { S.fx.t = 0; S.fx.flash = 1; burst(itemColor(item)); }
-  else if (kind === 'soft') S.fx.flash = .55;
+  if (kind === 'equip' && changed && item) {
+    S.fx.t = 0; S.fx.flash = 1; const col = itemColor(item); burst(col); ring(col); setTimeout(() => ring('#ffffff'), 140); focusOn(item.slot);
+    const sd = { id: s.id, ownedItems: s.ownedItems };
+    showPop(`<div><div>${minecraftMini({ ...sd, avatarLook: { ...S.prevA } })}</div><small>Before</small></div><span class="arrow">➜</span><div><div>${minecraftMini({ ...sd, avatarLook: { ...S.realA } })}</div><small>After</small></div><div class="txt"><small>${esc(tabInfo(item.slot)[1])} changed!</small><span>${item.icon || '✨'} ${esc(item.name)}</span></div>`);
+  } else if (kind) S.fx.flash = .55;
 }
 
 /* =============================================================
@@ -2475,7 +2654,7 @@ function wearHTML(s) {
   const a = lookWith(s, avatarPreviewItem), pv = avatarPreviewItem && avatarItem(avatarPreviewItem);
   const chips = ['hair', 'shirt', 'pants', 'shoes', 'hat', 'backpack', 'accessory'].map(k => ({ k, x: avatarItem(a[k]) })).filter(o => o.x).map(({ k, x }) => {
     const opt = OPT.includes(k), tr = pv && pv.slot === k;
-    return `<button type="button" class="mcx-chip ${tr ? 'try' : ''}" ${opt && !tr ? `onclick="removeAvatarSlot('${k}')" title="Take off"` : ''}>${x.icon} ${esc(x.name)}${opt && !tr ? ' ✕' : ''}${tr ? ' (try-on)' : ''}</button>`;
+    return `<button type="button" class="mcx-chip ${tr ? 'try' : ''} ${mcxNew === k ? 'new' : ''}" ${opt && !tr ? `onclick="removeAvatarSlot('${k}')" title="Take off"` : ''}>${x.icon} ${esc(x.name)}${opt && !tr ? ' ✕' : ''}${tr ? ' (try-on)' : ''}</button>`;
   }).join('');
   return `<b>Currently wearing</b><div class="mcx-chips">${chips}</div>`;
 }
@@ -2486,8 +2665,8 @@ function badgeHTML() {
 function catalogHTML(s) {
   const look = avatarData(s), slot = avatarEditorTab;
   if (slot === 'body') {
-    const gcard = g => { const pv = { ...s, avatarLook: { ...look, gender: g, hair: g === 'girl' ? 'hair-girl-basic' : 'hair-boy-basic' } }; return `<button type="button" class="mcx-gender ${look.gender === g ? 'on' : ''}" onclick="setAvatarGender('${g}')">${minecraftMini(pv)}${g === 'girl' ? '👧 Girl' : '👦 Boy'}</button>`; };
-    return `<div class="mcx-bodybox"><div><h3 class="ctitle disp">Character</h3><div class="mcx-genders mt8">${gcard('boy')}${gcard('girl')}</div></div><div><h3 class="ctitle disp">Skin tone</h3><div class="mcx-tones mt8">${AVATAR_TONES.map((t, i) => `<button type="button" class="mcx-tone ${look.tone === i ? 'on' : ''}" title="${t.name}" style="--tone:${t.color}" onclick="setAvatarTone(${i})"></button>`).join('')}</div></div><div class="mcx-tip">⭐ Earn tokens by scanning the teacher code. Try anything on for free, buy it to keep it forever, and tap ✕ to take items off.</div></div>`;
+    const gcard = g => { const pv = { ...s, avatarLook: { ...look, gender: g, hair: g === 'girl' ? 'hair-girl-basic' : 'hair-boy-basic' } }; return `<button type="button" class="mcx-gender ${look.gender === g ? 'on' : ''}" aria-pressed="${look.gender === g}" onclick="setAvatarGender('${g}')">${minecraftMini(pv)}${g === 'girl' ? '👧 Girl' : '👦 Boy'}</button>`; };
+    return `<div class="mcx-bodybox"><div><h3 class="ctitle disp">Character</h3><div class="mcx-genders mt8">${gcard('boy')}${gcard('girl')}</div></div><div><h3 class="ctitle disp">Skin tone</h3><div class="mcx-tones mt8">${AVATAR_TONES.map((t, i) => `<button type="button" class="mcx-tone ${look.tone === i ? 'on' : ''}" aria-pressed="${look.tone === i}" aria-label="${t.name} skin tone" title="${t.name}" style="--tone:${t.color}" onclick="setAvatarTone(${i})"></button>`).join('')}</div></div><div class="mcx-tip">⭐ Earn tokens by scanning the teacher code. Try anything on for free, buy it to keep it forever, and tap ✕ to take items off.</div></div>`;
   }
   const items = AVATAR_ITEMS.filter(x => x.slot === slot && (!x.gender || x.gender === look.gender) && (!avatarCatalogQuery || (x.name+' '+x.id).toLowerCase().includes(avatarCatalogQuery)));
   const none = OPT.includes(slot) ? `<article class="mcx-slot ${!look[slot] ? 'wear' : ''}"><div class="mcx-ico" style="--c:#555"><span>🚫</span></div><div class="mcx-meta"><b>None</b><span class="mcx-price ok">Go without</span></div><div class="mcx-act">${look[slot] ? `<button type="button" class="btn slate sm" onclick="removeAvatarSlot('${slot}')">Take off</button>` : '<button type="button" class="btn green sm" disabled>Selected</button>'}</div></article>` : '';
@@ -2499,10 +2678,14 @@ function catalogHTML(s) {
     return `<article class="mcx-slot ${owned ? 'own' : ''} ${wear ? 'wear' : ''} ${prev ? 'try' : ''}" onmouseenter="mcxHover('${x.id}')" onmouseleave="mcxHover(null)">${wear ? '<span class="mcx-on">ON</span>' : ''}<div class="mcx-ico" style="--c:${itemColor(x)}"><span>${x.icon}</span></div><div class="mcx-meta"><b title="${esc(x.name)}">${esc(x.name)}</b><span class="mcx-price ${owned ? 'ok' : (can || !x.cost) ? '' : 'no'}">${owned ? '✓ Owned' : x.cost ? '⭐ ' + x.cost + ' tokens' : 'Free'}</span></div><div class="mcx-act">${act}</div></article>`;
   }).join('') : `<p class=\"mcx-empty\">No gear matches that search. Try another name.</p>`);
 }
-function tabsHTML() { return TABS.map(([k, l, e]) => `<button type="button" class="mcx-tab ${avatarEditorTab === k ? 'on' : ''}" onclick="setAvatarCategory('${k}')"><i>${e}</i><span>${l}</span></button>`).join(''); }
+function tabsHTML() { return TABS.map(([k, l, e]) => `<button type="button" class="mcx-tab ${avatarEditorTab === k ? 'on' : ''}" aria-pressed="${avatarEditorTab === k}" onclick="setAvatarCategory('${k}')"><i>${e}</i><span>${l}</span></button>`).join(''); }
 const setHTML = (id, html) => { const e = document.getElementById(id); if (e && e.innerHTML !== html) e.innerHTML = html; };
 function refreshSkins(kind, item) {
   const s = activeStudent(); if (!s || ui.view !== 'student-skins') return;
+  mcxNew = (kind === 'equip' && item) ? item.slot : null;
+  const g0 = avatarData(s).gender, gt = document.getElementById('mcx-gtag'), stg = document.getElementById('mcx-stage');
+  if (gt) { gt.className = 'mcx-gtag ' + g0; gt.textContent = g0 === 'girl' ? '👧 GIRL' : '👦 BOY'; }
+  if (stg) { stg.classList.toggle('boy', g0 === 'boy'); stg.classList.toggle('girl', g0 === 'girl'); }
   const cat = document.getElementById('mcx-catalog'), st = cat ? cat.scrollTop : 0;
   setHTML('mcx-bal', `⭐ ${s.stars} tokens`); setHTML('mcx-tabs', tabsHTML());
   setHTML('mcx-cattitle', `<h3 class="ctitle disp">${tabInfo(avatarEditorTab)[1]}</h3>`);
@@ -2517,24 +2700,37 @@ window.renderStudentSkinsView = function () {
   destroy3D();
   const s = activeStudent(); if (!s) { setTimeout(() => switchView('student-login'), 0); return ''; }
   avatarPreviewItem = null; avatarData(s); if (!TABS.some(t => t[0] === avatarEditorTab)) avatarEditorTab = 'shirt';
-  const tools = [['auto', '🔄', 'Auto-rotate'], ['wave', '👋', 'Wave'], ['front', '🧍', 'Front view'], ['back', '🔙', 'Back view'], ['zin', '＋', 'Zoom in'], ['zout', '－', 'Zoom out']].map(([k, i, t]) => `<button type="button" class="mcx-tool" id="mcx-t-${k}" title="${t}" aria-label="${t}" onclick="mcxTool('${k}')">${i}</button>`).join('');
+  const tools = [['auto', '🔄', 'Auto-rotate'], ['wave', '👋', 'Wave'], ['cmp', '⏪', 'Before / After'], ['front', '🧍', 'Front view'], ['back', '🔙', 'Back view'], ['zin', '＋', 'Zoom in'], ['zout', '－', 'Zoom out']].map(([k, i, t]) => `<button type="button" class="mcx-tool" id="mcx-t-${k}" title="${t}" aria-label="${t}" onclick="mcxTool('${k}')">${i}</button>`).join('');
   return `<div class="mcx"><header class="mcx-top"><div class="flex ac gap12 fw"><button type="button" class="btn slate sm" onclick="switchView('student-dashboard')">← Dashboard</button><h1 class="disp">Skin Studio</h1></div><span class="mcx-bal" id="mcx-bal">⭐ ${s.stars} tokens</span></header>
-  <div class="mcx-grid"><section class="mcx-left"><div class="mcx-name"><div><span class="chip gold">3D MINECRAFT SKIN</span><h2 class="disp mt8">${esc(s.name)}</h2></div></div>
-  <div class="mcx-stage" id="mcx-stage"><div class="mcx-sky"><i class="mcx-cloud c1"></i><i class="mcx-cloud c2"></i><i class="mcx-cloud c3"></i></div><div class="mcx-host" id="avatar-3d"></div><div class="mcx-fb" id="mcx-fb">${minecraftMini(s)}</div><div class="mcx-badge hide" id="mcx-badge"></div><div class="mcx-tools">${tools}</div><div class="mcx-hint">Drag to spin • Scroll to zoom • Hover gear to preview</div></div><div class="mcx-dance-dock" aria-label="Fortnite-style avatar emotes"><span class="mcx-dance-label">🕺 Emotes</span><button type="button" class="mcx-dance-btn" onclick="mcxTool('dance-floss')">🪩 Floss</button><button type="button" class="mcx-dance-btn" onclick="mcxTool('dance-takeL')">🦵 Take the L</button><button type="button" class="mcx-dance-btn" onclick="mcxTool('dance-orange')">🧡 Orange Justice</button><button type="button" class="mcx-dance-btn" onclick="mcxTool('dance-shuffle')">⚡ Electro Shuffle</button><button type="button" class="mcx-dance-btn" onclick="mcxTool('dance-bestm')">🏃 Best Mates</button></div>
+  <div class="mcx-grid"><section class="mcx-left"><div class="mcx-name"><div><span class="chip gold">3D MINECRAFT SKIN</span><span class="mcx-gtag ${avatarData(s).gender}" id="mcx-gtag">${avatarData(s).gender === 'girl' ? '👧 GIRL' : '👦 BOY'}</span><h2 class="disp mt8">${esc(s.name)}</h2></div></div>
+  <div class="mcx-stage ${avatarData(s).gender}" id="mcx-stage"><div class="mcx-sky"><i class="mcx-cloud c1"></i><i class="mcx-cloud c2"></i><i class="mcx-cloud c3"></i></div><div class="mcx-host" id="avatar-3d"></div><div class="mcx-fb" id="mcx-fb">${minecraftMini(s)}</div><div class="mcx-badge hide" id="mcx-badge"></div><div class="mcx-tools">${tools}</div><div class="mcx-hint">Drag to spin • Scroll to zoom • Hover gear to preview</div></div><div class="mcx-dance"><div class="mcx-dh"><b>🎶 DANCE FLOOR</b><span class="flex gap8"><button type="button" class="mcx-dmini" id="mcx-snd" onclick="mcxSound()" aria-pressed="true">🔊 Beat</button><button type="button" class="mcx-dmini" onclick="mcxDance(null)">⏹ Stop</button></span></div><div class="mcx-dgrid" id="mcx-dgrid">${danceHTML()}</div></div>
   <div class="mcx-wear" id="mcx-wear">${wearHTML(s)}</div></section>
   <section class="mcx-closet"><div class="flex jb ac gap12"><div><span class="chip">STYLE YOUR SKIN</span><h2 class="disp mt8">Closet</h2></div><span class="mcx-bal" id="mcx-catcount" style="font-size:12px">🎒 ${s.ownedItems.length} owned</span></div><nav class="mcx-tabs" id="mcx-tabs" aria-label="Skin categories">${tabsHTML()}</nav><div class="mcx-cathead"><div id="mcx-cattitle"><h3 class="ctitle disp">${tabInfo(avatarEditorTab)[1]}</h3></div><span class="tiny">Tap a tab to browse</span></div><div class="mcx-catalog" id="mcx-catalog">${catalogHTML(s)}</div></section></div></div>`;
 };
 /* ---------- interactions ---------- */
 window.mcxTool = function (k) {
-  if (!S) { if (k === 'wave' || k === 'front' || k === 'back' || k.startsWith('dance-')) showToast('3D view is still loading…', 'info'); return; }
+  if (!S) { if (k === 'wave' || k === 'front' || k === 'back' || k.startsWith('dance-') || k === 'cmp') showToast('3D view is still loading…', 'info'); return; }
   S.lastInt = performance.now();
   if (k === 'auto') { S.auto = !S.auto; const b = document.getElementById('mcx-t-auto'); if (b) b.classList.toggle('on', S.auto); }
   else if (k === 'wave') { S.wave = 1.8; sfx('pop'); }
-  else if(k.startsWith('dance-')){S.dance=k.slice(6);S.danceStart=performance.now();S.danceUntil=S.danceStart+5200;S.auto=false;sfx('pop');showToast('Dance break!','success');}
+  else if (k === 'cmp') {
+    if (!S.prevA) { showToast('Nothing to compare yet. Equip something first!', 'info'); return; }
+    clearTimeout(S.cmpT); S.cmp = true; syncPerson(null, null, true); showPop('<div class="txt"><small>Previous look</small>⏪ BEFORE</div>');
+    S.cmpT = setTimeout(() => { if (!S) return; S.cmp = false; syncPerson(null, null, true); showPop('<div class="txt"><small>Current look</small>✨ AFTER</div>'); }, 1500);
+  }
+  else if (k.startsWith('dance-')) mcxDance(k.slice(6));
   else if (k === 'front') { S.auto = false; S.goYaw = 0; } else if (k === 'back') { S.auto = false; S.goYaw = Math.PI; }
   else if (k === 'zin') S.zoom = Math.max(.6, S.zoom * .85); else if (k === 'zout') S.zoom = Math.min(1.5, S.zoom * 1.18);
   if (k === 'front' || k === 'back') { const b = document.getElementById('mcx-t-auto'); if (b) b.classList.remove('on'); }
 };
+window.mcxDance = function (k) {
+  if (!S) { showToast('3D view is still loading…', 'info'); return; }
+  if (k === 'random') k = DKEYS[Math.floor(Math.random() * DKEYS.length)];
+  if (!k || S.dance === k) { S.dance = null; beat.stop(); }
+  else { S.dance = k; S.danceT0 = S.t; S.auto = false; S.goYaw = 0; S.lastInt = performance.now(); beat.start(); const b = document.getElementById('mcx-t-auto'); if (b) b.classList.remove('on'); showPop(`<div class="txt"><small>Now dancing</small>${DANCES[k].e} ${DANCES[k].n}</div>`); }
+  setHTML('mcx-dgrid', danceHTML());
+};
+window.mcxSound = function () { beat.on = !beat.on; const b = document.getElementById('mcx-snd'); if (b) b.textContent = beat.on ? '🔊 Beat' : '🔇 Muted'; if (!beat.on) beat.stop(); else if (S && S.dance) beat.start(); };
 window.mcxHover = function (id) {
   if (!S || !(window.matchMedia && matchMedia('(hover:hover)').matches)) return;
   S.hover = id; clearTimeout(S.hoverT); S.hoverT = setTimeout(() => syncPerson(null, null), 70);
@@ -2547,13 +2743,13 @@ window.setAvatarGender = async function (g) {
   const sid = ui.activeStudentId;
   const res = await mutate(st => { const s = st.students.find(x => x.id === sid); if (!s) return { error: 'no-student' }; const a = avatarData(s); a.gender = g; for (const slot of ['hair', 'shirt', 'pants', 'shoes', 'hat', 'backpack', 'accessory']) { const item = avatarItem(a[slot]); if (item && item.gender && item.gender !== g) { const fb = AVATAR_ITEMS.find(x => x.slot === slot && x.cost === 0 && (!x.gender || x.gender === g)); a[slot] = fb ? fb.id : null; } } return { ok: true }; });
   if (res && res.error) { fail(res); return; }
-  avatarPreviewItem = null; sfx('pop'); refreshSkins('equip', avatarItem(g === 'girl' ? 'hair-girl-basic' : 'hair-boy-basic'));
+  avatarPreviewItem = null; sfx('pop'); refreshSkins('equip', { slot: 'body', name: g === 'girl' ? 'Girl' : 'Boy', icon: g === 'girl' ? '👧' : '👦', color: g === 'girl' ? '#ff6eaa' : '#4aa3ff' });
 };
 window.setAvatarTone = async function (i) {
   const sid = ui.activeStudentId;
   const res = await mutate(st => { const s = st.students.find(x => x.id === sid); if (!s) return { error: 'no-student' }; avatarData(s).tone = i; return { ok: true }; });
   if (res && res.error) { fail(res); return; }
-  sfx('pop'); refreshSkins('soft');
+  sfx('pop'); refreshSkins('equip', { slot: 'body', name: (AVATAR_TONES[i] || {}).name + ' skin', icon: '🎨', color: (AVATAR_TONES[i] || {}).color });
 };
 window.buyAvatarItem = async function (id) {
   const sid = ui.activeStudentId, item = avatarItem(id); if (!item) return;
@@ -2568,10 +2764,10 @@ window.wearAvatarItem = async function (id) {
   avatarPreviewItem = null; if (S) S.hover = null; sfx('pop'); refreshSkins('equip', item);
 };
 window.removeAvatarSlot = async function (slot) {
-  if (!OPT.includes(slot)) return; const sid = ui.activeStudentId;
+  if (!OPT.includes(slot)) return; const sid = ui.activeStudentId, cur = activeStudent(), old = cur && avatarItem(avatarData(cur)[slot]);
   const res = await mutate(st => { const s = st.students.find(x => x.id === sid); if (!s) return { error: 'no-student' }; avatarData(s)[slot] = null; return { ok: true }; });
   if (res && res.error) { fail(res); return; }
-  avatarPreviewItem = null; sfx('pop'); refreshSkins('soft');
+  avatarPreviewItem = null; sfx('pop'); refreshSkins('equip', { slot, name: 'Took off ' + (old ? old.name : 'item'), icon: '🗑️', color: '#aab4a8' });
 };
 })();
 </script>
