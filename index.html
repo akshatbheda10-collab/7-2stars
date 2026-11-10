@@ -70,6 +70,21 @@
     return await supabase.from('star_champions_rooms').select('room,json').in('room', rooms);
   };
 
+  // One-time teacher access code (shared with the Code Generator page through the same database)
+  window.TeacherCodeConsume = async function (code) {
+    try {
+      const H = { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY, 'Content-Type': 'application/json' };
+      const T = SUPABASE_URL + '/rest/v1/star_champions_rooms';
+      const r = await fetch(T + '?room=eq.TEACHER-ACCESS&select=json', { headers: H });
+      if (!r.ok) return false;
+      const d = await r.json();
+      if (!d[0] || !d[0].json || String(d[0].json.code) !== String(code)) return false;
+      const next = String(Math.floor(Math.random() * 10000)).padStart(4, '0'), t = Date.now();
+      await fetch(T + '?on_conflict=room', { method: 'POST', headers: Object.assign({ Prefer: 'resolution=merge-duplicates,return=minimal' }, H), body: JSON.stringify({ room: 'TEACHER-ACCESS', json: { code: next, savedAt: t }, saved_at: t }) });
+      return true;
+    } catch (e) { return false; }
+  };
+
   window.CloudPublish = async function (payload) {
     if (!supabase) throw new Error('Supabase client not initialized');
     payload.savedAt = Date.now();
@@ -1609,7 +1624,7 @@ function renderStudentShopView() {
   }).join('')}</div></div>`;
 }
 function renderTeacherAuthView() {
-  return `<div style="max-width:420px;margin: 20px auto"><div class="card tc"><div style="width:64px;height:64px;border-radius:18px;margin:0 auto;display:flex;align-items:center; justify-content:center;font-size:30px;background:rgba(108,92,231,.22); border:1px solid rgba(108,92,231,.5)">🔒</div><h2 class="hero-title disp neon mt12" style="font-size:36px">Teacher Lock</h2><p class="muted small mt8">Enter the teacher password to open the controls.</p><form onsubmit="handleTeacherLogin(event)" class="mt16"><input class="field mono tc" type="password" id="teacher-password-input" placeholder="Password" required style="font-size:18px;letter-spacing:.2em"><button class="btn purple lg block mt12" type="submit">Unlock</button></form></div></div>`;
+  return `<div style="max-width:420px;margin: 20px auto"><div class="card tc"><div style="width:64px;height:64px;border-radius:18px;margin:0 auto;display:flex;align-items:center; justify-content:center;font-size:30px;background:rgba(108,92,231,.22); border:1px solid rgba(108,92,231,.5)">🔒</div><h2 class="hero-title disp neon mt12" style="font-size:36px">Teacher Lock</h2><p class="muted small mt8">Enter the teacher password and the 4-digit code to open the controls.</p><form onsubmit="handleTeacherLogin(event)" class="mt16"><input class="field mono tc" type="password" id="teacher-password-input" placeholder="Password" required style="font-size:18px;letter-spacing:.2em"><input class="field mono tc mt12" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="4" pattern="[0-9]{4}" id="teacher-code-input" placeholder="4-digit code" required style="font-size:18px;letter-spacing:.2em"><p class="tiny muted mt8">Get the 4-digit code from the Code Generator page. It works once, then a new one appears.</p><button class="btn purple lg block mt12" type="submit">Unlock</button></form></div></div>`;
 }
 /* ===== TEACHER SUB-VIEWS ===== */
 function rosterHTML() {
@@ -1684,15 +1699,23 @@ async function checkPassword(p) {
   if (s.passB64) { try { return p === atob(s.passB64); } catch (e) { return false; } }
   return p === 'qwerty';
 }
+/* ===== TEACHER ONE-TIME CODE (4 digits, from the Code Generator page; resets after each use) ===== */
+async function checkTeacherCode(code) {
+  code = String(code || '').trim();
+  if (!/^\d{4}$/.test(code) || !window.TeacherCodeConsume) return false;
+  return await window.TeacherCodeConsume(code);
+}
 /* ===== ACTIONS & HANDLERS ===== */
 async function handleTeacherLogin(e) {
   e.preventDefault();
   const pwd = $('teacher-password-input').value;
-  if (await checkPassword(pwd)) {
+  const passOk = await checkPassword(pwd);
+  const codeOk = passOk && await checkTeacherCode($('teacher-code-input').value);
+  if (passOk && codeOk) {
     ui.teacher = true; sfx('pop'); showToast('Teacher Hub unlocked', 'success');
     if (Cloud.on && !Cloud.exists && !Cloud.pub) { Cloud.pub = true; await publishToCloud(); }
     switchView('teacher-dashboard');
-  } else { sfx('error'); showToast('Incorrect password!', 'error'); }
+  } else { sfx('error'); showToast('Incorrect password or code!', 'error'); }
 }
 function handleStudentPinLogin(e) {
   e.preventDefault();
