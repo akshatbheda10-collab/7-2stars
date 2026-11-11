@@ -64,6 +64,19 @@
     return { result, st };
   };
 
+  window.CloudMutateRoom = async function (room, fn) {
+    if (!supabase && window.supabase && window.supabase.createClient) supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    if (!supabase) return { result: { error: 'offline' }, st: null };
+    const { data, error } = await supabase.from('star_champions_rooms').select('json').eq('room', room).maybeSingle();
+    if (error || !data) return { result: { error: 'no-class' }, st: null };
+    const st = data.json; const result = fn(st);
+    if (result && result.error) return { result, st: null };
+    st.savedAt = Date.now();
+    const { error: saveError } = await supabase.from('star_champions_rooms').upsert({ room, json: st, saved_at: st.savedAt });
+    if (saveError) return { result: { error: 'cloud-fail' }, st: null };
+    return { result, st };
+  };
+
   window.CloudReadCores = async function (rooms) {
     if (!supabase && window.supabase && window.supabase.createClient) supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
     if (!supabase) return { data:null, error:new Error('Cloud client is unavailable') };
@@ -518,6 +531,7 @@ body{background:#100c2d;color:#fff}.aurora{background:radial-gradient(55% 45% at
 <button class="nav-btn" id="nav-leaderboard" onclick="switchView('leaderboard')"><span data-ic="trophy"></span><span class="nt">Leaderboard</span></button>
 <button class="nav-btn" id="nav-fun" onclick="switchView('fun-screen')"><span>🎉</span><span class="nt">Fun Screen</span></button>
 <button class="nav-btn" id="nav-teams" onclick="switchView('teams')"><span>🤝</span><span class="nt">Teams</span></button>
+<button class="nav-btn" id="nav-forms" onclick="switchView('forms')"><span>📝</span><span class="nt">Forms</span></button>
 <button class="nav-btn" id="nav-guides" onclick="switchView('guides')"><span>🎬</span><span class="nt">Video Guides</span></button>
 <button class="nav-btn" id="nav-student" onclick="openStudent()"><span data-ic="user"></span><span class="nt">Student</span></button>
 <button class="nav-btn" id="nav-teacher" onclick="openTeacher()"><span data-ic="monitor"></span><span class="nt">Teacher</span></button>
@@ -953,11 +967,16 @@ function softRerenderNow() {
     const sc = Array.from(document.querySelectorAll('.scroll')).map(e => e.scrollTop);
     renderView(v, true);
     document.querySelectorAll('.scroll').forEach((e, i) => { if (sc[i]) e.scrollTop = sc[i]; });
-  } else if (v === 'teacher-dashboard') refreshTeacherLists();
+  } else if (v === 'teams' || (v === 'forms' && !F7.taking)) {
+    const ae = document.activeElement; if (!ae || !/INPUT|TEXTAREA|SELECT/.test(ae.tagName)) renderView(v, true);
+  } else if (v === 'teacher-dashboard') {
+    refreshTeacherLists(); const ae = document.activeElement, idle = !ae || !/INPUT|TEXTAREA|SELECT/.test(ae.tagName);
+    if (idle && ((ui.tab === 'groups' && !G7.loading) || (ui.tab === 'forms' && !F7.draft))) renderView('teacher-dashboard', true);
+  }
 }
 function killScanner() { if (html5QrScanner) { try { const p = html5QrScanner.clear(); if (p && p.catch) p.catch(() => {}); } catch (e) {} html5QrScanner = null; } }
 function updateNav() {
-  const v = ui.view, m = { leaderboard:v === 'leaderboard', fun:v === 'fun-screen', teams:v === 'teams', guides:v === 'guides', student:v.startsWith('student'), teacher:v.startsWith('teacher') };
+  const v = ui.view, m = { leaderboard:v === 'leaderboard', fun:v === 'fun-screen', teams:v === 'teams', forms:v === 'forms', guides:v === 'guides', student:v.startsWith('student'), teacher:v.startsWith('teacher') };
   Object.keys(m).forEach(k => { const b = $("nav-" + k); if (b) b.className = 'nav-btn ' + (m[k] ? 'active' : ''); });
 }
 function switchView(name) { killScanner(); closeProjector(); ui.view = name; persistSession(); updateNav(); renderView(name); window.scrollTo(0, 0); }
@@ -972,6 +991,7 @@ function renderView(name, quiet) {
       case 'leaderboard': c.innerHTML = renderLeaderboardView(); break;
       case 'fun-screen': c.innerHTML = renderFunScreenView(); break;
       case 'teams': c.innerHTML = renderTeamsView(); break;
+      case 'forms': c.innerHTML = renderFormsView(); break;
       case 'guides': c.innerHTML = renderGuidesView(); break;
       case 'student-login': c.innerHTML = renderStudentLoginView(); break;
       case 'student-dashboard': c.innerHTML = renderStudentDashboardView(); break;
@@ -1671,8 +1691,8 @@ function awardClass(amount){askConfirm('Give every student +'+amount+' star for 
 function renderTeacherDashboardView() {
   const mult = state.settings.multiplier || 1, tab = ui.tab || 'roster', pend = state.redemptions.filter(x => !x.done).length;
   const cdot = Cloud.configured ? (Cloud.on ? '' : 'bad') : 'warn';
-  const body = tab === 'prizes' ? prizesTabHTML() : tab === 'setup' ? `<div id="save-center">${saveCenterHTML()}</div>` : tab === 'tools' ? teacherToolsHTML() : tab === 'weekly' ? renderTeacherWeeklyQuizHTML() : tab === 'announcements' ? renderTeacherAnnouncementHTML() : rosterTabHTML();
-  return `<div class="stack"><div class="flex jb ac fw gap16"><div><span class="chip">TEACHER HUB • ${esc(Cloud.room)}</span><h2 class="hero-title disp neon mt8" style="font-size:36px">Command Center</h2><p class="tiny mt8">Students: <b style="color:#fff" id="roster-count">${state.students.length}</b> • Claims Waiting: <b class="gold" id="claims-pending">${pend}</b></p></div><div class="flex fw gap8"><button class="btn goldb sm" onclick="openPicker()"><span data-ic="dice"></span>Random Picker</button><button class="btn goldb sm" onclick="openPrintCards()"><span data-ic="print"></span>Print Cards</button><button class="btn slate sm" onclick="openProjector('board')"><span data-ic="cast"></span>Projector</button><button class="btn slate sm" onclick="openProjector('slides')"><span data-ic="slides"></span>Slides</button><button class="btn slate sm" onclick="openProjector('split')"><span data-ic="cast"></span>Split</button><button class="btn slate sm" onclick="openSettings()"><span data-ic="sliders"></span>Settings</button><button class="btn slate sm" onclick="lockTeacher()"><span data-ic="lock"></span>Lock</button></div></div>${Cloud.configured&&!Cloud.on?connNotice():''}<div class="card gold-b"><div class="flex ac gap24 fw jc"><div class="qrbox"><div id="teacher-active-qr-canvas"></div></div><div class="f1" style="min-width:250px"><span class="chip gold">STAR DISPENSER</span><div class="mono b gold mt8" style="font-size:34px;letter-spacing:.2em" id="teacher-token-label">${esc(state.currentQrToken)}</div><p class="tiny mt4">Each scan gives <b class="gold">+${mult} star${mult > 1 ? 's' : ''}</b>, then changes.</p><div class="flex fw gap8 mt12 ac"><button class="btn goldb" onclick="openProjector('qr')"><span data-ic="cast"></span>Project Full Screen</button><button class="btn slate sm" onclick="manualRegenerateQr()"><span data-ic="rotate"></span>New Code</button></div><div class="flex fw gap8 mt12 ac"><span class="tiny b">Star Power:</span>${[1, 2, 3].map(n => `<button class="btn sm ${mult===n?'goldb':'slate'}" onclick="setMultiplier(${n})">${n}x</button>`).join('')}</div></div></div></div><div><div class="tabs"><button class="tab ${tab === 'roster' ? 'active' : ''}" onclick="setTab('roster')"><span data-ic="users"></span>Roster</button><button class="tab ${tab === 'prizes' ? 'active' : ''}" onclick="setTab('prizes')"><span data-ic="gift"></span>Prize Store ${pend ? '<span class="chip gold">' + pend + '</span>' : ''}</button><button class="tab ${tab === 'setup' ? 'active' : ''}" onclick="setTab('setup')"><i class="dot ${cdot}"></i>Database Engine</button><button class="tab ${tab === 'tools' ? 'active' : ''}" onclick="setTab('tools')">🎯 Class Tools</button><button class="tab ${tab === 'weekly' ? 'active' : ''}" onclick="setTab('weekly')">🧠 Weekly Quiz</button><button class="tab ${tab === 'announcements' ? 'active' : ''}" onclick="setTab('announcements')">📣 Announcements</button></div><div class="mt16">${body}</div></div></div>`;
+  const body = tab === 'prizes' ? prizesTabHTML() : tab === 'setup' ? `<div id="save-center">${saveCenterHTML()}</div>` : tab === 'tools' ? teacherToolsHTML() : tab === 'forms' ? renderTeacherFormsHTML() : tab === 'groups' ? renderTeacherGroupsHTML() : tab === 'weekly' ? renderTeacherWeeklyQuizHTML() : tab === 'announcements' ? renderTeacherAnnouncementHTML() : rosterTabHTML();
+  return `<div class="stack"><div class="flex jb ac fw gap16"><div><span class="chip">TEACHER HUB • ${esc(Cloud.room)}</span><h2 class="hero-title disp neon mt8" style="font-size:36px">Command Center</h2><p class="tiny mt8">Students: <b style="color:#fff" id="roster-count">${state.students.length}</b> • Claims Waiting: <b class="gold" id="claims-pending">${pend}</b></p></div><div class="flex fw gap8"><button class="btn goldb sm" onclick="openPicker()"><span data-ic="dice"></span>Random Picker</button><button class="btn goldb sm" onclick="openPrintCards()"><span data-ic="print"></span>Print Cards</button><button class="btn slate sm" onclick="openProjector('board')"><span data-ic="cast"></span>Projector</button><button class="btn slate sm" onclick="openProjector('slides')"><span data-ic="slides"></span>Slides</button><button class="btn slate sm" onclick="openProjector('split')"><span data-ic="cast"></span>Split</button><button class="btn slate sm" onclick="openSettings()"><span data-ic="sliders"></span>Settings</button><button class="btn slate sm" onclick="lockTeacher()"><span data-ic="lock"></span>Lock</button></div></div>${Cloud.configured&&!Cloud.on?connNotice():''}<div class="card gold-b"><div class="flex ac gap24 fw jc"><div class="qrbox"><div id="teacher-active-qr-canvas"></div></div><div class="f1" style="min-width:250px"><span class="chip gold">STAR DISPENSER</span><div class="mono b gold mt8" style="font-size:34px;letter-spacing:.2em" id="teacher-token-label">${esc(state.currentQrToken)}</div><p class="tiny mt4">Each scan gives <b class="gold">+${mult} star${mult > 1 ? 's' : ''}</b>, then changes.</p><div class="flex fw gap8 mt12 ac"><button class="btn goldb" onclick="openProjector('qr')"><span data-ic="cast"></span>Project Full Screen</button><button class="btn slate sm" onclick="manualRegenerateQr()"><span data-ic="rotate"></span>New Code</button></div><div class="flex fw gap8 mt12 ac"><span class="tiny b">Star Power:</span>${[1, 2, 3].map(n => `<button class="btn sm ${mult===n?'goldb':'slate'}" onclick="setMultiplier(${n})">${n}x</button>`).join('')}</div></div></div></div><div><div class="tabs"><button class="tab ${tab === 'roster' ? 'active' : ''}" onclick="setTab('roster')"><span data-ic="users"></span>Roster</button><button class="tab ${tab === 'prizes' ? 'active' : ''}" onclick="setTab('prizes')"><span data-ic="gift"></span>Prize Store ${pend ? '<span class="chip gold">' + pend + '</span>' : ''}</button><button class="tab ${tab === 'setup' ? 'active' : ''}" onclick="setTab('setup')"><i class="dot ${cdot}"></i>Database Engine</button><button class="tab ${tab === 'tools' ? 'active' : ''}" onclick="setTab('tools')">🎯 Class Tools</button><button class="tab ${tab === 'forms' ? 'active' : ''}" onclick="setTab('forms')">📝 Forms</button><button class="tab ${tab === 'groups' ? 'active' : ''}" onclick="setTab('groups')">👥 Groups</button><button class="tab ${tab === 'weekly' ? 'active' : ''}" onclick="setTab('weekly')">🧠 Weekly Quiz</button><button class="tab ${tab === 'announcements' ? 'active' : ''}" onclick="setTab('announcements')">📣 Announcements</button></div><div class="mt16">${body}</div></div></div>`;
 }
 function renderTeacherQrCanvas() { drawQR($('teacher-active-qr-canvas'), state.currentQrToken, 170); }
 async function manualRegenerateQr() {
@@ -2848,5 +2868,721 @@ window.removeAvatarSlot = async function (slot) {
 })();
 </script>
 
+<style id="v7-css">
+/* ===== v7: Forms, Groups, Teams, Videos ===== */
+.chip.green{background:rgba(16,185,129,.14);border-color:rgba(16,185,129,.5);color:#a7f3d0}
+.green{color:#6ee7b7}.mb8{margin-bottom:8px}.mb12{margin-bottom:12px}.gap12{gap:12px}.gap16{gap:16px}
+.v7-score{padding:6px 10px;border-radius:10px;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.35);display:inline-block;font-size:13px}
+.v7-formcard{text-align:left}
+.v7-fillwrap{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.v7-form,.v7-q,.v7-formhead{position:relative;background:linear-gradient(145deg,rgba(35,29,78,.95),rgba(20,16,52,.96));border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:18px 20px}
+.v7-form{padding-top:26px;overflow:hidden}.v7-formtop{position:absolute;left:0;right:0;top:0;height:10px;background:linear-gradient(90deg,#8b5cf6,#ec4899,#fbbf24)}
+.v7-form h1{margin:0;font-size:28px}
+.v7-qtext{font-weight:700;font-size:16px}.v7-req{color:#fb7185;font-weight:900}
+.v7-q.v7-bad{border-color:#fb7185;box-shadow:0 0 0 2px rgba(251,113,133,.35)}
+.v7-opts{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.v7-opt{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(7,5,20,.5);cursor:pointer;font-size:14px}
+.v7-opt:hover{border-color:#a78bfa}.v7-opt.on{border-color:#a78bfa;background:rgba(124,92,255,.22)}
+.v7-opt input,.v7-sc input{accent-color:#8b5cf6;width:18px;height:18px;margin:0}
+.v7-scale{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.v7-sc{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(7,5,20,.5);cursor:pointer;font-weight:800;min-width:46px}
+.v7-sc.on{border-color:#a78bfa;background:rgba(124,92,255,.25)}
+.v7-section{padding:6px 4px}.v7-section h3{margin:0;font-size:20px}
+.v7-rev{padding:10px 12px;border-radius:12px;background:rgba(7,5,20,.5);border:1px solid rgba(255,255,255,.1)}
+.v7-rev.ok{border-color:rgba(16,185,129,.6)}.v7-rev.no{border-color:rgba(251,113,133,.6)}
+.v7-tpls{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.v7-tpl{display:flex;flex-direction:column;gap:4px;align-items:flex-start;text-align:left;padding:14px;border-radius:16px;border:1px solid rgba(255,255,255,.14);background:rgba(7,5,20,.55);color:#fff;cursor:pointer;font-family:inherit}
+.v7-tpl:hover{border-color:#fbbf24;transform:translateY(-2px)}.v7-tplic{font-size:28px}
+.v7-frow{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between;padding:12px 14px;border-radius:14px;background:rgba(7,5,20,.5);border:1px solid rgba(255,255,255,.08)}
+.v7-editor{max-width:820px;margin:0 auto}
+.v7-formhead{padding-top:26px;overflow:hidden;display:flex;flex-direction:column;gap:6px}
+.v7-title{background:none;border:0;border-bottom:2px solid rgba(255,255,255,.15);color:#fff;font-size:28px;font-weight:800;padding:6px 2px;font-family:inherit;outline:none;width:100%}
+.v7-desc{background:none;border:0;border-bottom:1px solid rgba(255,255,255,.12);color:#d4d0f5;font-size:14px;padding:6px 2px;font-family:inherit;outline:none;width:100%}
+.v7-title:focus,.v7-desc:focus{border-bottom-color:#a78bfa}
+.v7-qcard{padding:16px;border-radius:16px;background:linear-gradient(145deg,rgba(35,29,78,.95),rgba(20,16,52,.96));border:1px solid rgba(255,255,255,.14);border-left:5px solid #8b5cf6}
+.v7-qcard:focus-within{border-left-color:#fbbf24;box-shadow:0 0 0 1px rgba(251,191,36,.25)}
+.v7-qtop{display:grid;grid-template-columns:1fr 210px;gap:10px}
+@media(max-width:640px){.v7-qtop{grid-template-columns:1fr}}
+.v7-optrow{display:flex;gap:8px;align-items:center;margin-top:6px}.v7-mark{width:22px;text-align:center;color:#a9a4d3}
+.v7-key{white-space:nowrap;padding:7px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(7,5,20,.6);color:#d4d0f5;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit}
+.v7-key.on{background:rgba(16,185,129,.25);border-color:#10b981;color:#a7f3d0}
+.v7-x{background:none;border:0;color:#a9a4d3;cursor:pointer;font-size:16px;padding:6px}.v7-x:hover{color:#fb7185}
+.v7-qfoot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08)}
+.v7-ib{width:34px;height:34px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(7,5,20,.6);color:#fff;cursor:pointer;font-size:14px}
+.v7-ib:hover:not(:disabled){border-color:#a78bfa}.v7-ib.bad:hover{border-color:#fb7185}.v7-ib:disabled{opacity:.35;cursor:not-allowed}
+.v7-pts{width:74px!important;padding:6px 8px!important;display:inline-block}
+.v7-switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:13px}.v7-switch input{accent-color:#8b5cf6;width:18px;height:18px}
+.v7-addgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.v7-add{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:1px dashed rgba(255,255,255,.25);background:rgba(7,5,20,.5);color:#fff;cursor:pointer;font-weight:700;font-size:13px;font-family:inherit}
+.v7-add:hover{border-color:#fbbf24;background:rgba(251,191,36,.08)}.v7-add span{color:#fbbf24;min-width:24px}
+.v7-previewmodal{max-height:75vh;overflow:auto}
+.v7-bar{display:grid;grid-template-columns:minmax(90px,1.2fr) 3fr 90px;gap:10px;align-items:center;margin-top:6px;font-size:13px}
+.v7-bartrack{height:14px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}.v7-bartrack i{display:block;height:100%;background:linear-gradient(90deg,#8b5cf6,#ec4899);border-radius:99px;transition:width .4s}.v7-bartrack i.ok{background:linear-gradient(90deg,#10b981,#34d399)}
+.v7-barnum{text-align:right;color:#a9a4d3;font-size:12px}
+.v7-textlist{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow:auto}.v7-textrow{padding:8px 10px;border-radius:10px;background:rgba(7,5,20,.5);border:1px solid rgba(255,255,255,.08)}
+.v7-ind summary{cursor:pointer;list-style:none}.v7-ind summary::-webkit-details-marker{display:none}
+.v7-chips{display:flex;flex-wrap:wrap;gap:6px}.v7-pill{padding:5px 11px;border-radius:99px;border:1px solid rgba(255,255,255,.18);background:rgba(7,5,20,.55);font-size:12px}
+.v7-radio{display:inline-flex;cursor:pointer}.v7-radio input{display:none}.v7-radio span{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,.25);font-weight:800;font-size:13px}
+.v7-radio input:checked+span{background:#10b981;border-color:#10b981;color:#fff}
+.v7-import summary{cursor:pointer}
+/* groups */
+.v7-steps{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px}.v7-steps i{flex:1;min-width:14px;height:2px;background:rgba(255,255,255,.12)}
+.v7-step{display:flex;align-items:center;gap:8px;font-weight:800;font-size:13px;color:#a9a4d3}.v7-step span{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,.2);font-size:12px}
+.v7-step.on{color:#fff}.v7-step.on span{background:#fbbf24;border-color:#fbbf24;color:#1c1917}.v7-step.done span{background:#10b981;border-color:#10b981;color:#fff}
+.v7-stugrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;max-height:420px;overflow:auto;padding:2px}
+.v7-stu{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:12px;border:2px solid rgba(255,255,255,.12);background:rgba(7,5,20,.55);color:#fff;cursor:pointer;text-align:left;font-family:inherit;position:relative}
+.v7-stu:hover{border-color:#a78bfa}.v7-stun{font-weight:700;font-size:13px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.v7-stutag{display:none;font-size:9px;font-weight:900;letter-spacing:.06em;background:#f43f5e;color:#fff;padding:2px 6px;border-radius:99px}
+.v7-stu.abs{border-color:#f43f5e;background:rgba(244,63,94,.16)}.v7-stu.abs .v7-stun{text-decoration:line-through;opacity:.7}.v7-stu.abs .v7-stutag{display:inline-block}.v7-stu.abs .v7-stuav{opacity:.45;filter:grayscale(1)}
+.v7-stuav,.v7-av{display:inline-flex;width:34px;height:34px;align-items:center;justify-content:center;flex:none;overflow:hidden;border-radius:10px}
+.v7-choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.v7-choice{display:flex;flex-direction:column;gap:3px;align-items:flex-start;text-align:left;padding:14px;border-radius:16px;border:2px solid rgba(255,255,255,.14);background:rgba(7,5,20,.55);color:#fff;cursor:pointer;font-family:inherit}
+.v7-choice span{font-size:26px}.v7-choice em{font-style:normal;font-size:12px;color:#a9a4d3}.v7-choice.on{border-color:#fbbf24;background:rgba(251,191,36,.1)}
+.v7-groups{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.v7-gcard{padding:14px;border-radius:16px;background:linear-gradient(160deg,rgba(35,29,78,.95),rgba(20,16,52,.96));border:1px solid rgba(255,255,255,.14);border-top:5px solid var(--c)}
+.v7-gcard.pop{animation:v7pop .5s cubic-bezier(.2,1.4,.4,1) both}
+@keyframes v7pop{from{opacity:0;transform:scale(.6) translateY(14px)}to{opacity:1;transform:none}}
+.v7-gname{flex:1;min-width:0;background:none;border:0;border-bottom:1px dashed rgba(255,255,255,.2);color:#fff;font-weight:800;font-size:16px;font-family:inherit;padding:4px 2px;outline:none}
+.v7-members{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.v7-mrow,.v7-unrow{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px;border-radius:10px;background:rgba(7,5,20,.5);font-size:13px;font-weight:600}
+.v7-move{max-width:112px;background:rgba(7,5,20,.8);color:#d4d0f5;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:4px;font-size:11px;font-family:inherit}
+.v7-unassigned{padding:12px;border-radius:14px;border:1px dashed rgba(251,191,36,.5);background:rgba(251,191,36,.05)}
+.v7-unlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px}
+.v7-set{padding:14px;border-radius:14px;background:rgba(7,5,20,.5);border:1px solid rgba(255,255,255,.09)}.v7-set.off{opacity:.6}
+.v7-bigboard{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;max-height:68vh;overflow:auto}
+.v7-bigcard{padding:14px;border-radius:16px;background:rgba(124,92,255,.15);border:1px solid rgba(167,139,250,.4)}.v7-bigtitle{font-weight:900;font-size:18px;margin-bottom:8px;color:#fde68a}.v7-bigname{font-size:20px;font-weight:700;padding:3px 0}
+/* teams */
+.v7-hero{border-radius:22px;padding:22px;background:radial-gradient(circle at 12% 0%,color-mix(in srgb,var(--c) 45%,transparent),transparent 50%),linear-gradient(145deg,#231d4e,#14103a);border:2px solid var(--c);box-shadow:0 18px 50px color-mix(in srgb,var(--c) 28%,transparent)}
+.v7-heroTop{display:flex;gap:16px;align-items:center;flex-wrap:wrap}.v7-heroEmoji{font-size:60px;width:92px;height:92px;display:flex;align-items:center;justify-content:center;border-radius:24px;background:color-mix(in srgb,var(--c) 28%,#0c0a24);border:2px solid var(--c)}
+.v7-heroName{margin:6px 0 0;font-size:34px;line-height:1.1}.v7-motto{font-style:italic;color:#d4d0f5;margin:4px 0 0}
+.v7-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:18px}
+.v7-tile{padding:12px;border-radius:14px;background:rgba(7,5,20,.55);border:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;gap:4px}.v7-tile span{font-size:12px;color:#a9a4d3;font-weight:700}.v7-tile b{font-size:26px}.v7-tile small{font-size:13px;color:#a9a4d3}
+.v7-memlist{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px;margin-top:16px}
+.v7-mem{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:12px;background:rgba(7,5,20,.5);border:1px solid rgba(255,255,255,.08)}
+.v7-memgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+.v7-assign{padding:16px;border-radius:18px;background:linear-gradient(145deg,rgba(35,29,78,.95),rgba(20,16,52,.96));border:2px solid var(--c)}
+.v7-emojis{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:6px}.v7-em{font-size:22px;padding:6px;border-radius:10px;border:2px solid rgba(255,255,255,.12);background:rgba(7,5,20,.5);cursor:pointer}.v7-em.on{border-color:#fbbf24;background:rgba(251,191,36,.15)}
+.v7-colors{display:flex;gap:8px;flex-wrap:wrap}.v7-co{width:32px;height:32px;border-radius:50%;border:3px solid transparent;cursor:pointer}.v7-co.on{border-color:#fff;box-shadow:0 0 0 2px #0008}
+.v7-podium{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.v7-pod{padding:14px;border-radius:18px;text-align:center;background:linear-gradient(180deg,color-mix(in srgb,var(--c) 22%,#1a1540),#14103a);border:2px solid var(--c)}.v7-podm{font-size:30px}.v7-pode{font-size:40px;margin:4px 0}
+.v7-lrow{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:rgba(7,5,20,.5);border:1px solid rgba(255,255,255,.08);border-left:5px solid var(--c);flex-wrap:wrap}.v7-rk{font-weight:900;color:#a9a4d3;min-width:34px}
+.v7-tcard{padding:14px;border-radius:16px;background:linear-gradient(160deg,rgba(35,29,78,.95),rgba(20,16,52,.96));border:1px solid rgba(255,255,255,.12);border-top:4px solid var(--c)}
+.v7-tcardTop{display:flex;gap:10px;align-items:center}.v7-tcardEmoji{font-size:30px;width:50px;height:50px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--c) 25%,#0c0a24)}
+.v7-avrow{display:flex;gap:4px;flex-wrap:wrap}
+.v7-ally{padding:14px;border-radius:16px;background:rgba(7,5,20,.55);border:1px solid rgba(255,255,255,.1)}.v7-allyteams{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.v7-allyteams i{font-style:normal;color:#fbbf24}
+/* videos */
+.gv-stage{position:relative;aspect-ratio:16/9;max-height:72vh;width:100%;border-radius:18px;overflow:hidden;background:radial-gradient(circle at 20% 10%,#4c2fb3 0,transparent 45%),radial-gradient(circle at 85% 90%,#be185d66 0,transparent 45%),#0b0820;border:1px solid #a78bfa88;box-shadow:0 18px 48px #0009;display:flex;flex-direction:column}
+.gv-shot{flex:1;padding:4% 5% 0;display:flex;min-height:0}.gv-shot.gv-in{animation:gvin .55s ease both}@keyframes gvin{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
+.gv-browser{flex:1;display:flex;flex-direction:column;border-radius:14px 14px 0 0;overflow:hidden;border:1px solid rgba(255,255,255,.18);background:#120e33;min-height:0}
+.gv-bar{display:flex;align-items:center;gap:6px;padding:8px 12px;background:#1d1750}.gv-bar i{width:10px;height:10px;border-radius:50%;background:#fb7185}.gv-bar i:nth-child(2){background:#fbbf24}.gv-bar i:nth-child(3){background:#34d399}
+.gv-url{margin-left:10px;flex:1;padding:3px 12px;border-radius:99px;background:#0b0820;font-size:11px;color:#a9a4d3}
+.gv-nav{display:flex;gap:4px;padding:8px 10px;flex-wrap:wrap;background:#171241;border-bottom:1px solid rgba(255,255,255,.08)}
+.gv-navi{position:relative;padding:5px 10px;border-radius:8px;font-size:clamp(9px,1.4vw,12px);font-weight:700;color:#a9a4d3}
+.gv-navi.hit{background:#fbbf24;color:#1c1917;animation:gvpulse 1.1s infinite}@keyframes gvpulse{50%{box-shadow:0 0 0 7px #fbbf2440}}
+.gv-point{position:absolute;left:50%;top:100%;transform:translateX(-50%);font-size:clamp(16px,2.6vw,26px);animation:gvpoint .9s ease-in-out infinite}@keyframes gvpoint{50%{transform:translate(-50%,6px)}}
+.gv-page{flex:1;display:flex;align-items:center;justify-content:center;gap:5%;padding:2% 5% 24%}
+.gv-icon{font-size:clamp(40px,9vw,96px);width:clamp(70px,15vw,160px);height:clamp(70px,15vw,160px);border-radius:28%;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle,#7c5cff55,#1d1750);border:2px solid #a78bfa;animation:gvfloat 3s ease-in-out infinite}@keyframes gvfloat{50%{transform:translateY(-8px) rotate(2deg)}}
+.gv-skel{display:flex;flex-direction:column;gap:10px;width:34%}.gv-skel i{display:block;height:clamp(8px,1.6vw,14px);border-radius:99px;background:linear-gradient(90deg,#2a2370,#4a3fb0,#2a2370);background-size:200% 100%;animation:gvsh 1.6s linear infinite}.gv-skel i.tab{height:clamp(14px,2.6vw,26px);border-radius:8px}@keyframes gvsh{to{background-position:-200% 0}}
+.gv-cap{position:absolute;left:0;right:0;bottom:0;padding:clamp(10px,2vw,22px) clamp(14px,3vw,32px) clamp(14px,2.4vw,24px);background:linear-gradient(180deg,transparent,#05030fee 38%)}
+.gv-count{font-size:clamp(9px,1.3vw,12px);font-weight:900;letter-spacing:.14em;color:#fbbf24}.gv-title{font-size:clamp(17px,3.2vw,34px);font-weight:700;line-height:1.1;margin-top:2px}
+.gv-arrow{display:inline-block;margin-top:4px;padding:2px 10px;border-radius:99px;background:#fbbf2422;border:1px solid #fbbf2477;color:#fde68a;font-weight:800;font-size:clamp(10px,1.5vw,14px)}
+.gv-text{margin:6px 0 0;font-size:clamp(11px,1.7vw,17px);line-height:1.4;color:#e9e6ff;max-width:900px}
+.gv-prog{position:absolute;left:0;right:0;bottom:0;height:5px;background:#ffffff1a}.gv-prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,#8b5cf6,#fbbf24)}
+.gv-ctrls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px}.gv-dots{font-weight:800;font-size:13px;color:#a9a4d3;padding:0 6px}.gv-speed{width:auto!important;padding:7px 10px!important}
+.gv-stage:fullscreen{max-height:none;border-radius:0}
+.gv-chapters{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.gv-chap{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(7,5,20,.5);color:#fff;cursor:pointer;text-align:left;font-family:inherit;font-size:13px}.gv-chap span{font-size:22px}.gv-chap.on,.gv-chap:hover{border-color:#fbbf24;background:rgba(251,191,36,.08)}
+@media(prefers-reduced-motion:reduce){.gv-icon,.gv-point,.gv-navi.hit,.gv-skel i,.v7-gcard.pop,.gv-shot.gv-in{animation:none!important}}
+
+</style>
+<script id="v7-js">
+/* ===================== FORMS (Google-Forms style) ===================== */
+const uid7 = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const today7 = () => new Date().toLocaleDateString('en-CA');
+const clone7 = o => JSON.parse(JSON.stringify(o));
+const F7 = { draft: null, isNew: false, resp: null, respTab: 'summary', taking: null, ans: {}, preview: false, wq: null, busy: false };
+const FORM_TYPES = { mc: 'Multiple choice', cb: 'Checkboxes', dd: 'Dropdown', tf: 'True / False', short: 'Short answer', para: 'Paragraph', scale: 'Linear scale (1–5)', header: 'Section title' };
+const FORM_ICON = { mc: '◉', cb: '☑', dd: '▾', tf: '✓✗', short: '▭', para: '▤', scale: '①–⑤', header: 'T' };
+const isChoice7 = t => t === 'mc' || t === 'cb' || t === 'dd' || t === 'tf';
+const isGradable7 = q => (isChoice7(q.type) && (q.correct || []).length > 0) || (q.type === 'short' && (q.answers || []).length > 0);
+
+function ensureForms(st) { st.settings = st.settings || {}; if (!Array.isArray(st.settings.forms)) st.settings.forms = []; return st.settings.forms; }
+
+function newQuestion7(type) {
+  type = type || 'mc';
+  const q = { id: uid7('q'), type, text: '', required: false, points: 1, options: [], correct: [], answers: [], help: '' };
+  if (type === 'mc' || type === 'cb' || type === 'dd') q.options = ['Option 1', 'Option 2'];
+  if (type === 'tf') q.options = ['True', 'False'];
+  if (type === 'scale') { q.minLabel = ''; q.maxLabel = ''; }
+  return q;
+}
+function blankForm7(kind) {
+  const f = { id: uid7('form'), title: 'Untitled form', description: '', status: 'draft', quiz: false, showScore: true, showAnswers: false, oneTry: true, starReward: 0, starMin: 100, createdAt: Date.now(), questions: [], responses: {} };
+  if (kind === 'quiz') {
+    f.title = 'Quick quiz'; f.quiz = true; f.showScore = true; f.showAnswers = true;
+    const a = newQuestion7('mc'); a.text = 'Which force pulls objects toward Earth?'; a.options = ['Friction', 'Gravity', 'Magnetism', 'Air']; a.correct = [1]; a.required = true;
+    const b = newQuestion7('tf'); b.text = 'Friction can slow a moving object down.'; b.correct = [0]; b.required = true;
+    const c = newQuestion7('short'); c.text = 'What do we call the speed of an object in a certain direction?'; c.answers = ['velocity']; c.required = true;
+    f.questions = [a, b, c];
+  } else if (kind === 'exit') {
+    f.title = 'Exit ticket'; f.description = 'Quick check before you leave class today.';
+    const a = newQuestion7('scale'); a.text = 'How well did you understand today’s lesson?'; a.minLabel = 'Not at all'; a.maxLabel = 'Totally got it'; a.required = true;
+    const b = newQuestion7('short'); b.text = 'What is one thing you learned today?'; b.required = true;
+    const c = newQuestion7('para'); c.text = 'What is still confusing? (optional)';
+    f.questions = [a, b, c];
+  } else if (kind === 'survey') {
+    f.title = 'Class feedback'; f.description = 'Help me make class better. Be honest!';
+    const a = newQuestion7('mc'); a.text = 'Which activity helped you learn the most?'; a.options = ['Labs', 'Notes', 'Group work', 'Games', 'Videos']; a.required = true;
+    const b = newQuestion7('cb'); b.text = 'What would you like more of? (pick any)'; b.options = ['Hands-on labs', 'Partner work', 'Review games', 'Quiet work time'];
+    const c = newQuestion7('para'); c.text = 'Anything else you want me to know?';
+    f.questions = [a, b, c];
+  } else {
+    f.questions = [newQuestion7('mc')];
+  }
+  return f;
+}
+
+/* ---------- grading ---------- */
+const norm7 = s => String(s == null ? '' : s).trim().toLowerCase().replace(/\s+/g, ' ');
+function gradeForm7(form, answers) {
+  let score = 0, max = 0; const detail = {};
+  (form.questions || []).forEach(q => {
+    if (!isGradable7(q)) return;
+    const pts = Math.max(0, Number(q.points) || 0); max += pts;
+    const a = answers[q.id]; let ok = false;
+    if (q.type === 'cb') { const got = Array.isArray(a) ? a.map(Number).sort().join(',') : ''; ok = got === (q.correct || []).map(Number).sort().join(','); }
+    else if (q.type === 'short') ok = (q.answers || []).some(x => norm7(x) === norm7(a));
+    else ok = a !== undefined && a !== null && a !== '' && Number(a) === Number(q.correct[0]);
+    detail[q.id] = ok; if (ok) score += pts;
+  });
+  return { score, max, detail };
+}
+
+/* ---------- STUDENT: list + fill ---------- */
+function formStatusChip7(f, resp) {
+  if (resp) return '<span class="chip green">✓ Submitted</span>';
+  return f.status === 'open' ? '<span class="chip gold">Open</span>' : '<span class="chip">Closed</span>';
+}
+function renderFormsView() {
+  const me = activeStudent();
+  if (!me) return `<div class="stack"><header class="card"><span class="chip gold">CLASS FORMS</span><h1 class="hero-title disp neon mt8">Forms</h1><p class="muted small mt8">Quizzes, exit tickets and surveys from your teacher.</p></header><section class="card"><h2 class="ctitle disp">Sign in to fill out forms</h2><p class="tiny mt8">Use your name and PIN.</p><button class="btn purple mt12" onclick="openStudent()">Student sign in</button></section></div>`;
+  if (F7.taking) { const f = (state.settings.forms || []).find(x => x.id === F7.taking); if (f) return renderFormFill7(f, false); F7.taking = null; }
+  const forms = (state.settings.forms || []).filter(f => f.status === 'open' || (f.responses || {})[me.id]);
+  const open = forms.filter(f => f.status === 'open' && !(f.responses || {})[me.id]);
+  const done = forms.filter(f => (f.responses || {})[me.id]);
+  const card = f => { const r = (f.responses || {})[me.id]; const canRetry = r && f.status === 'open' && f.oneTry === false;
+    return `<article class="box v7-formcard"><div class="flex jb ac gap8"><b>${esc(f.title)}</b>${formStatusChip7(f, r)}</div><p class="tiny mt8">${esc(f.description || (f.questions || []).filter(q => q.type !== 'header').length + ' questions')}</p>${r && f.quiz && f.showScore && r.max ? `<div class="v7-score mt8">Score: <b>${r.score}/${r.max}</b></div>` : ''}${!r ? `<button class="btn purple sm mt12" onclick="f7start('${f.id}')">Start</button>` : canRetry ? `<button class="btn blue sm mt12" onclick="f7start('${f.id}')">Try again</button>` : (f.showAnswers && f.quiz ? `<button class="btn slate sm mt12" onclick="f7review('${f.id}')">See my answers</button>` : '')}</article>`; };
+  return `<div class="stack"><header class="card"><span class="chip gold">CLASS FORMS</span><h1 class="hero-title disp neon mt8">Forms</h1><p class="muted small mt8">Quizzes, exit tickets and surveys from your teacher.</p></header><section class="card"><h2 class="ctitle disp">To do</h2>${open.length ? `<div class="cols-3 mt12">${open.map(card).join('')}</div>` : '<p class="tiny mt8">🎉 Nothing to fill out right now.</p>'}</section>${done.length ? `<section class="card"><h2 class="ctitle disp">Finished</h2><div class="cols-3 mt12">${done.map(card).join('')}</div></section>` : ''}</div>`;
+}
+function f7start(id) { F7.taking = id; F7.ans = {}; F7.preview = false; renderView('forms'); window.scrollTo(0, 0); }
+function f7exit() { F7.taking = null; F7.review = null; if ($('modal').classList.contains('open')) closeModal(); renderView(ui.teacher && ui.view === 'teacher-dashboard' ? 'teacher-dashboard' : 'forms'); }
+
+function renderQuestionInput7(q, ans, locked, key) {
+  const id = q.id;
+  if (q.type === 'header') return '';
+  const req = q.required ? '<span class="v7-req" title="Required"> *</span>' : '';
+  const head = `<div class="v7-qtext">${esc(q.text || 'Untitled question')}${req}</div>${q.help ? `<div class="tiny mt4">${esc(q.help)}</div>` : ''}`;
+  let body = '';
+  const dis = locked ? 'disabled' : '';
+  if (q.type === 'mc' || q.type === 'tf') body = `<div class="v7-opts">${q.options.map((o, i) => `<label class="v7-opt ${Number(ans) === i && ans !== undefined && ans !== '' ? 'on' : ''}"><input type="radio" name="fa-${key}${id}" ${Number(ans) === i && ans !== undefined && ans !== '' ? 'checked' : ''} ${dis} onchange="f7ans('${id}',${i})"><span>${esc(o)}</span></label>`).join('')}</div>`;
+  else if (q.type === 'cb') body = `<div class="v7-opts">${q.options.map((o, i) => { const on = Array.isArray(ans) && ans.includes(i); return `<label class="v7-opt ${on ? 'on' : ''}"><input type="checkbox" ${on ? 'checked' : ''} ${dis} onchange="f7cb('${id}',${i},this.checked)"><span>${esc(o)}</span></label>`; }).join('')}</div>`;
+  else if (q.type === 'dd') body = `<select class="field mt8" ${dis} onchange="f7ans('${id}',this.value===''?'':Number(this.value))"><option value="">Choose…</option>${q.options.map((o, i) => `<option value="${i}" ${ans !== undefined && ans !== '' && Number(ans) === i ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+  else if (q.type === 'short') body = `<input class="field mt8" maxlength="300" ${dis} value="${esc(ans || '')}" placeholder="Your answer" oninput="f7ans('${id}',this.value)">`;
+  else if (q.type === 'para') body = `<textarea class="field mt8" rows="4" maxlength="2000" ${dis} placeholder="Your answer" oninput="f7ans('${id}',this.value)">${esc(ans || '')}</textarea>`;
+  else if (q.type === 'scale') body = `<div class="v7-scale mt8">${q.minLabel ? `<span class="tiny">${esc(q.minLabel)}</span>` : ''}${[1, 2, 3, 4, 5].map(n => `<label class="v7-sc ${Number(ans) === n ? 'on' : ''}"><input type="radio" name="fa-${key}${id}" ${Number(ans) === n ? 'checked' : ''} ${dis} onchange="f7ans('${id}',${n})"><span>${n}</span></label>`).join('')}${q.maxLabel ? `<span class="tiny">${esc(q.maxLabel)}</span>` : ''}</div>`;
+  return head + body;
+}
+function f7ans(qid, v) { F7.ans[qid] = v; const c = document.querySelector(`[data-q="${qid}"]`); if (c) { c.classList.remove('v7-bad'); c.querySelectorAll('.v7-opt,.v7-sc').forEach(l => { const i = l.querySelector('input'); if (i && i.type === 'radio') l.classList.toggle('on', i.checked); }); } }
+function f7cb(qid, i, on) { const a = Array.isArray(F7.ans[qid]) ? F7.ans[qid].slice() : []; const k = a.indexOf(i); if (on && k < 0) a.push(i); if (!on && k >= 0) a.splice(k, 1); F7.ans[qid] = a; const c = document.querySelector(`[data-q="${qid}"]`); if (c) { c.classList.remove('v7-bad'); c.querySelectorAll('.v7-opt').forEach(l => { const inp = l.querySelector('input'); l.classList.toggle('on', inp.checked); }); } }
+
+function renderFormFill7(f, preview) {
+  const qs = f.questions || [];
+  const body = qs.map(q => q.type === 'header' ? `<div class="v7-section"><h3>${esc(q.text || 'Section')}</h3>${q.help ? `<p class="tiny mt4">${esc(q.help)}</p>` : ''}</div>` : `<div class="v7-q" data-q="${q.id}">${renderQuestionInput7(q, F7.ans[q.id], false, preview ? 'p' : 's')}</div>`).join('');
+  return `<div class="v7-fillwrap"><div class="v7-form"><div class="v7-formtop"></div><h1 class="disp">${esc(f.title)}</h1>${f.description ? `<p class="muted mt8">${esc(f.description)}</p>` : ''}${f.quiz ? `<span class="chip gold mt8">Quiz${f.starReward ? ` · earn ⭐ ${f.starReward} for ${f.starMin}%+` : ''}</span>` : ''}${preview ? '<div class="notice mt12">👀 Preview — nothing is saved.</div>' : ''}</div>${body}<div class="flex jb ac fw gap8 mt16"><button class="btn slate" onclick="f7exit()">${preview ? 'Close preview' : '← Back'}</button><button class="btn purple lg" ${preview ? 'disabled' : ''} onclick="f7submit('${f.id}')">Submit</button></div></div>`;
+}
+async function f7submit(id) {
+  if (F7.busy) return; const sid = ui.activeStudentId; const f = (state.settings.forms || []).find(x => x.id === id);
+  if (!f || !sid) return;
+  let bad = null;
+  document.querySelectorAll('.v7-q').forEach(el => el.classList.remove('v7-bad'));
+  (f.questions || []).forEach(q => { if (!q.required || q.type === 'header') return; const a = F7.ans[q.id]; const empty = a === undefined || a === null || a === '' || (Array.isArray(a) && !a.length) || (typeof a === 'string' && !a.trim()); if (empty) { const el = document.querySelector(`[data-q="${q.id}"]`); if (el) el.classList.add('v7-bad'); if (!bad) bad = el; } });
+  if (bad) { showToast('Please answer the required questions (*).', 'error'); bad.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+  F7.busy = true; const answers = clone7(F7.ans);
+  const r = await mutate(st => {
+    const form = ensureForms(st).find(x => x.id === id); if (!form) return { error: 'missing' }; if (form.status !== 'open') return { error: 'closed' };
+    form.responses = form.responses || {}; if (form.responses[sid] && form.oneTry !== false) return { error: 'done' };
+    const s = st.students.find(x => x.id === sid); if (!s) return { error: 'no-student' };
+    const g = gradeForm7(form, answers); const first = !form.responses[sid]; const prev = form.responses[sid];
+    form.responses[sid] = { at: Date.now(), answers, score: g.score, max: g.max, tries: ((prev && prev.tries) || 0) + 1, best: Math.max(g.score, (prev && prev.best) || 0), rewarded: !!(prev && prev.rewarded) };
+    let stars = 0;
+    if (form.quiz && Number(form.starReward) > 0 && g.max > 0 && !form.responses[sid].rewarded && (g.score / g.max) * 100 >= (Number(form.starMin) || 100)) { stars = Math.min(10, Number(form.starReward) | 0); s.stars = (s.stars | 0) + stars; s.totalEarned = (s.totalEarned | 0) + stars; form.responses[sid].rewarded = true; addLog(st, '📝', s.name + ' earned ' + stars + ' star' + (stars > 1 ? 's' : '') + ' on “' + form.title + '”'); }
+    else if (first) addLog(st, '📝', s.name + ' turned in “' + form.title + '”');
+    return { ok: true, score: g.score, max: g.max, stars };
+  });
+  F7.busy = false;
+  if (r && r.error) { showToast(r.error === 'done' ? 'You already turned this in.' : r.error === 'closed' ? 'This form is closed.' : 'Could not submit. Check the connection and try again.', 'error'); if (r.error !== 'offline' && r.error !== 'cloud-fail') { F7.taking = null; renderView('forms'); } return; }
+  F7.taking = null; F7.ans = {};
+  if (r.stars) { sfx('star'); celebrate(); }
+  const msg = f.quiz && f.showScore && r.max ? `You scored ${r.score}/${r.max}.` : 'Your answers were sent.';
+  openModal(`<div class="tc"><div style="font-size:56px">${r.stars ? '🌟' : '✅'}</div><h3 class="ctitle disp mt8">Submitted!</h3><p class="mt8">${esc(msg)}</p>${r.stars ? `<p class="gold b mt8">+${r.stars} ⭐ added to your balance!</p>` : ''}<button class="btn purple mt16" onclick="closeModal();renderView('forms')">Done</button></div>`);
+  renderView('forms');
+}
+function f7review(id) {
+  const me = activeStudent(); const f = (state.settings.forms || []).find(x => x.id === id); if (!me || !f) return; const r = (f.responses || {})[me.id]; if (!r) return;
+  const g = gradeForm7(f, r.answers || {});
+  const rows = (f.questions || []).filter(q => q.type !== 'header').map(q => `<div class="v7-rev ${g.detail[q.id] === true ? 'ok' : g.detail[q.id] === false ? 'no' : ''}"><b>${esc(q.text)}</b><div class="tiny mt4">Your answer: ${esc(answerText7(q, (r.answers || {})[q.id]))}</div>${g.detail[q.id] === false ? `<div class="tiny mt4 gold">Correct: ${esc(correctText7(q))}</div>` : ''}</div>`).join('');
+  openModal(`${modalHead(esc(f.title))}<p class="tiny mt8">Score: <b>${r.score}/${r.max}</b></p><div class="stack mt12">${rows}</div>`);
+}
+function answerText7(q, a) {
+  if (a === undefined || a === null || a === '' || (Array.isArray(a) && !a.length)) return '—';
+  if (q.type === 'mc' || q.type === 'tf' || q.type === 'dd') return q.options[Number(a)] || '—';
+  if (q.type === 'cb') return (Array.isArray(a) ? a : []).map(i => q.options[i]).filter(Boolean).join(', ') || '—';
+  return String(a);
+}
+function correctText7(q) { if (q.type === 'short') return (q.answers || []).join(' / '); return (q.correct || []).map(i => q.options[i]).join(', '); }
+
+/* ---------- TEACHER: forms tab ---------- */
+function paintTeacher7(keepScroll) { const y = window.scrollY; renderView('teacher-dashboard'); if (keepScroll) window.scrollTo(0, y); }
+function renderTeacherFormsHTML() {
+  if (F7.draft) return renderFormEditor7();
+  if (F7.resp) return renderFormResponses7();
+  const forms = state.settings.forms || [];
+  const tpl = (k, icon, name, d) => `<button class="v7-tpl" onclick="f7new('${k}')"><span class="v7-tplic">${icon}</span><b>${name}</b><span class="tiny">${d}</span></button>`;
+  return `<div class="stack"><section class="card"><div class="flex jb ac fw gap8"><div><span class="chip gold">FORM BUILDER</span><h3 class="ctitle disp mt8">Make a form in seconds</h3><p class="tiny mt4">Build quizzes, exit tickets and surveys just like Google Forms. Students fill them out on the Forms page, and answers show up here.</p></div><button class="btn goldb" onclick="f7new('blank')">➕ New form</button></div><div class="v7-tpls mt16">${tpl('blank', '📄', 'Blank form', 'Start from scratch')}${tpl('quiz', '🧠', 'Quick quiz', 'Auto-graded, optional ⭐ reward')}${tpl('exit', '🎟️', 'Exit ticket', 'Scale + short answers')}${tpl('survey', '💬', 'Feedback survey', 'Multiple choice + comments')}</div></section><section class="card"><h3 class="ctitle disp">Your forms</h3>${forms.length ? `<div class="stack mt12">${forms.map(f => { const n = Object.keys(f.responses || {}).length; const qn = (f.questions || []).filter(q => q.type !== 'header').length; return `<div class="v7-frow"><div class="f1"><b>${esc(f.title)}</b> ${f.quiz ? '<span class="chip">Quiz</span>' : ''} <span class="chip ${f.status === 'open' ? 'green' : f.status === 'closed' ? '' : 'gold'}">${f.status === 'open' ? 'Open' : f.status === 'closed' ? 'Closed' : 'Draft'}</span><div class="tiny mt4">${qn} question${qn === 1 ? '' : 's'} · ${n}/${state.students.length} responded</div></div><div class="flex fw gap8"><button class="btn slate sm" onclick="f7edit('${f.id}')">✏️ Edit</button><button class="btn blue sm" onclick="f7open('${f.id}')">📊 Responses</button>${f.status === 'open' ? `<button class="btn slate sm" onclick="f7status('${f.id}','closed')">⏹ Close</button>` : `<button class="btn green sm" onclick="f7status('${f.id}','open')">▶ Open</button>`}<button class="btn slate sm" onclick="f7dup('${f.id}')" title="Duplicate">⧉</button><button class="btn red sm" onclick="f7del('${f.id}')" title="Delete">🗑</button></div></div>`; }).join('')}</div>` : '<p class="tiny mt8">No forms yet. Pick a template above.</p>'}</section><section class="card"><span class="chip">WEEKLY BRAIN BOOST</span><h3 class="ctitle disp mt8">Weekly 10-question science quiz</h3><p class="tiny mt4">The arcade quiz now has a point-and-click question editor too.</p><button class="btn purple mt12" onclick="setTab('weekly')">🧠 Open weekly quiz editor</button></section></div>`;
+}
+function f7new(kind) { F7.draft = blankForm7(kind); F7.isNew = true; F7.resp = null; paintTeacher7(); window.scrollTo(0, 0); }
+function f7edit(id) { const f = (state.settings.forms || []).find(x => x.id === id); if (!f) return; F7.draft = clone7(f); F7.isNew = false; paintTeacher7(); window.scrollTo(0, 0); }
+function f7cancel() { F7.draft = null; F7.resp = null; paintTeacher7(); }
+async function f7status(id, status) { const r = await mutate(st => { const f = ensureForms(st).find(x => x.id === id); if (!f) return { error: 'missing' }; f.status = status; addLog(st, '📝', '“' + f.title + '” is now ' + status); return { ok: true }; }); if (r && r.error) return showToast(explainError(r), 'error'); showToast(status === 'open' ? 'Form is open to students.' : 'Form closed.', 'success'); paintTeacher7(true); }
+async function f7dup(id) { const r = await mutate(st => { const forms = ensureForms(st), f = forms.find(x => x.id === id); if (!f) return { error: 'missing' }; const c = clone7(f); c.id = uid7('form'); c.title = f.title + ' (copy)'; c.status = 'draft'; c.responses = {}; c.createdAt = Date.now(); c.questions.forEach(q => q.id = uid7('q')); forms.push(c); return { ok: true }; }); if (r && r.error) return showToast(explainError(r), 'error'); paintTeacher7(true); }
+function f7del(id) { const f = (state.settings.forms || []).find(x => x.id === id); askConfirm('Delete “' + (f ? f.title : 'this form') + '” and all its responses?', async () => { const r = await mutate(st => { st.settings.forms = ensureForms(st).filter(x => x.id !== id); return { ok: true }; }); if (r && r.error) return showToast(explainError(r), 'error'); paintTeacher7(true); }); }
+
+/* ---------- editor ---------- */
+function renderFormEditor7() {
+  const d = F7.draft, qs = d.questions;
+  const typeOpts = cur => Object.keys(FORM_TYPES).map(t => `<option value="${t}" ${t === cur ? 'selected' : ''}>${FORM_ICON[t]}  ${FORM_TYPES[t]}</option>`).join('');
+  const card = (q, i) => {
+    let body = '';
+    if (q.type === 'header') body = `<input class="field mt8" placeholder="Description (optional)" value="${esc(q.help || '')}" oninput="f7q(${i},'help',this.value)">`;
+    else if (isChoice7(q.type)) {
+      body = `<div class="v7-optlist mt8">${q.options.map((o, j) => { const on = (q.correct || []).includes(j); return `<div class="v7-optrow"><span class="v7-mark">${q.type === 'cb' ? '☐' : q.type === 'dd' ? (j + 1) + '.' : '○'}</span><input class="field" value="${esc(o)}" ${q.type === 'tf' ? 'readonly' : ''} placeholder="Option ${j + 1}" oninput="f7opt(${i},${j},this.value)">${d.quiz ? `<button class="v7-key ${on ? 'on' : ''}" title="Mark as correct answer" onclick="f7key(${i},${j})">${on ? '✓ Correct' : 'Mark correct'}</button>` : ''}${q.type !== 'tf' && q.options.length > 2 ? `<button class="v7-x" title="Remove option" onclick="f7delopt(${i},${j})">✕</button>` : ''}</div>`; }).join('')}</div>${q.type !== 'tf' ? `<button class="btn slate sm mt8" onclick="f7addopt(${i})">➕ Add option</button>` : ''}`;
+    } else if (q.type === 'short') body = `<input class="field mt8" disabled placeholder="Short answer text">${d.quiz ? `<label class="lbl mt8">Accepted answers (separate with commas — leave empty for no grading)</label><input class="field" value="${esc((q.answers || []).join(', '))}" placeholder="e.g. gravity, gravitational force" oninput="f7ansKey(${i},this.value)">` : ''}`;
+    else if (q.type === 'para') body = '<textarea class="field mt8" rows="2" disabled placeholder="Long answer text"></textarea>';
+    else if (q.type === 'scale') body = `<div class="cols-2 mt8"><input class="field" maxlength="30" placeholder="Label for 1 (optional)" value="${esc(q.minLabel || '')}" oninput="f7q(${i},'minLabel',this.value)"><input class="field" maxlength="30" placeholder="Label for 5 (optional)" value="${esc(q.maxLabel || '')}" oninput="f7q(${i},'maxLabel',this.value)"></div><div class="v7-scale mt8">${[1, 2, 3, 4, 5].map(n => `<span class="v7-sc"><span>${n}</span></span>`).join('')}</div>`;
+    const showPts = d.quiz && (isChoice7(q.type) || q.type === 'short');
+    return `<div class="v7-qcard" id="fq-${i}"><div class="v7-qtop"><input class="field v7-qin" maxlength="300" placeholder="${q.type === 'header' ? 'Section title' : 'Question'}" value="${esc(q.text)}" oninput="f7q(${i},'text',this.value)"><select class="field v7-qtype" onchange="f7type(${i},this.value)">${typeOpts(q.type)}</select></div>${q.type !== 'header' ? `<input class="field mt8 v7-help" maxlength="200" placeholder="Help text (optional)" value="${esc(q.help || '')}" oninput="f7q(${i},'help',this.value)">` : ''}${body}<div class="v7-qfoot"><div class="flex ac gap12 fw">${q.type !== 'header' ? `<label class="v7-switch"><input type="checkbox" ${q.required ? 'checked' : ''} onchange="f7q(${i},'required',this.checked)"><span>Required</span></label>` : ''}${showPts ? `<label class="tiny flex ac gap8">Points <input type="number" min="0" max="100" class="field v7-pts" value="${Number(q.points) || 0}" oninput="f7q(${i},'points',Number(this.value))"></label>` : ''}</div><div class="flex gap8"><button class="v7-ib" title="Move up" ${i === 0 ? 'disabled' : ''} onclick="f7move(${i},-1)">↑</button><button class="v7-ib" title="Move down" ${i === qs.length - 1 ? 'disabled' : ''} onclick="f7move(${i},1)">↓</button><button class="v7-ib" title="Duplicate question" onclick="f7dupq(${i})">⧉</button><button class="v7-ib bad" title="Delete question" onclick="f7delq(${i})">🗑</button></div></div></div>`;
+  };
+  const adders = Object.keys(FORM_TYPES).map(t => `<button class="v7-add" onclick="f7addq('${t}')"><span>${FORM_ICON[t]}</span>${FORM_TYPES[t]}</button>`).join('');
+  return `<div class="v7-editor"><div class="flex jb ac fw gap8 mb12"><button class="btn slate sm" onclick="f7cancel()">← Back to forms</button><div class="flex fw gap8"><button class="btn slate sm" onclick="f7preview()">👀 Preview</button><button class="btn blue sm" onclick="f7save(false)">💾 Save</button><button class="btn goldb sm" onclick="f7save(true)">🚀 Save & open to students</button></div></div><div class="v7-formhead card"><div class="v7-formtop"></div><input class="v7-title" maxlength="120" placeholder="Form title" value="${esc(d.title)}" oninput="F7.draft.title=this.value"><input class="v7-desc" maxlength="400" placeholder="Form description" value="${esc(d.description || '')}" oninput="F7.draft.description=this.value"></div><div class="card v7-settings"><div class="flex fw gap16 ac"><label class="v7-switch"><input type="checkbox" ${d.quiz ? 'checked' : ''} onchange="f7quiz(this.checked)"><span><b>Make this a quiz</b> (auto-grade)</span></label>${d.quiz ? `<label class="v7-switch"><input type="checkbox" ${d.showScore ? 'checked' : ''} onchange="F7.draft.showScore=this.checked"><span>Show score after submitting</span></label><label class="v7-switch"><input type="checkbox" ${d.showAnswers ? 'checked' : ''} onchange="F7.draft.showAnswers=this.checked"><span>Let students review answers</span></label>` : ''}<label class="v7-switch"><input type="checkbox" ${d.oneTry === false ? 'checked' : ''} onchange="F7.draft.oneTry=!this.checked"><span>Allow retakes</span></label></div>${d.quiz ? `<div class="flex fw gap8 ac mt12 tiny">⭐ Star reward: <input type="number" min="0" max="10" class="field v7-pts" value="${Number(d.starReward) || 0}" oninput="F7.draft.starReward=Math.max(0,Math.min(10,Number(this.value)||0))"> star(s) for scoring at least <input type="number" min="1" max="100" class="field v7-pts" value="${Number(d.starMin) || 100}" oninput="F7.draft.starMin=Math.max(1,Math.min(100,Number(this.value)||100))">% <span class="muted">(0 = no reward; awarded once per student)</span></div>` : ''}</div><div id="fq-list" class="stack mt12">${qs.map(card).join('') || '<div class="card tc tiny">No questions yet — add one below.</div>'}</div><div class="v7-addbar card mt12"><div class="tiny b mb8">Add a question</div><div class="v7-addgrid">${adders}</div></div></div>`;
+}
+function f7q(i, k, v) { const q = F7.draft.questions[i]; if (q) q[k] = v; }
+function f7opt(i, j, v) { const q = F7.draft.questions[i]; if (q) q.options[j] = v; }
+function f7ansKey(i, v) { const q = F7.draft.questions[i]; if (q) q.answers = v.split(',').map(x => x.trim()).filter(Boolean); }
+function f7quiz(on) { F7.draft.quiz = on; paintTeacher7(true); }
+function f7key(i, j) { const q = F7.draft.questions[i]; if (!q) return; q.correct = q.correct || []; if (q.type === 'cb') { const k = q.correct.indexOf(j); if (k >= 0) q.correct.splice(k, 1); else q.correct.push(j); } else q.correct = q.correct[0] === j ? [] : [j]; paintTeacher7(true); }
+function f7addopt(i) { const q = F7.draft.questions[i]; q.options.push('Option ' + (q.options.length + 1)); paintTeacher7(true); }
+function f7delopt(i, j) { const q = F7.draft.questions[i]; q.options.splice(j, 1); q.correct = (q.correct || []).filter(x => x !== j).map(x => x > j ? x - 1 : x); paintTeacher7(true); }
+function f7type(i, t) { const q = F7.draft.questions[i], n = newQuestion7(t); q.type = t; q.options = n.options; q.correct = []; q.answers = []; if (t === 'scale') { q.minLabel = q.minLabel || ''; q.maxLabel = q.maxLabel || ''; } paintTeacher7(true); }
+function f7addq(t) { F7.draft.questions.push(newQuestion7(t)); paintTeacher7(); const el = $('fq-' + (F7.draft.questions.length - 1)); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); const inp = el.querySelector('.v7-qin'); if (inp) inp.focus(); } }
+function f7delq(i) { F7.draft.questions.splice(i, 1); paintTeacher7(true); }
+function f7dupq(i) { const c = clone7(F7.draft.questions[i]); c.id = uid7('q'); F7.draft.questions.splice(i + 1, 0, c); paintTeacher7(true); }
+function f7move(i, d) { const a = F7.draft.questions, j = i + d; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; paintTeacher7(true); }
+function f7check() {
+  const d = F7.draft; if (!d.title.trim()) return 'Give your form a title.';
+  const real = d.questions.filter(q => q.type !== 'header'); if (!real.length) return 'Add at least one question.';
+  for (let i = 0; i < d.questions.length; i++) { const q = d.questions[i]; if (!q.text.trim()) return `Question ${i + 1} needs some text.`; if (isChoice7(q.type) && (q.options.filter(o => String(o).trim()).length < 2)) return `Question ${i + 1} needs at least two options.`; }
+  return '';
+}
+function f7preview() { const err = f7check(); if (err) return showToast(err, 'info'); F7.ans = {}; F7.preview = true; openModal(`<div class="v7-previewmodal">${renderFormFill7(F7.draft, true)}</div>`); }
+async function f7save(openIt) {
+  const err = f7check(); if (err) return showToast(err, 'info');
+  const d = clone7(F7.draft); d.title = d.title.trim(); d.questions.forEach(q => { q.text = q.text.trim(); q.options = (q.options || []).map(o => String(o).trim()); });
+  if (openIt) d.status = 'open';
+  const r = await mutate(st => { const forms = ensureForms(st), k = forms.findIndex(x => x.id === d.id); if (k >= 0) { const old = forms[k]; d.responses = old.responses || {}; if (!openIt) d.status = old.status; forms[k] = d; } else { d.responses = {}; forms.push(d); } addLog(st, '📝', 'Teacher ' + (openIt ? 'opened' : 'saved') + ' the form “' + d.title + '”'); return { ok: true }; });
+  if (r && r.error) return showToast(explainError(r), 'error');
+  showToast(openIt ? 'Saved — students can fill it out now!' : 'Form saved.', 'success'); F7.draft = null; paintTeacher7(); window.scrollTo(0, 0);
+}
+
+/* ---------- responses ---------- */
+function f7open(id) { F7.resp = id; F7.respTab = 'summary'; paintTeacher7(); window.scrollTo(0, 0); }
+function f7rtab(t) { F7.respTab = t; paintTeacher7(true); }
+function renderFormResponses7() {
+  const f = (state.settings.forms || []).find(x => x.id === F7.resp); if (!f) { F7.resp = null; return renderTeacherFormsHTML(); }
+  const resp = f.responses || {}, ids = Object.keys(resp).filter(id => state.students.some(s => s.id === id)), n = ids.length;
+  const nameOf = id => (state.students.find(s => s.id === id) || {}).name || 'Student';
+  const tabs = [['summary', 'Summary'], ['individual', 'Individual'], ['missing', 'Not yet (' + (state.students.length - n) + ')']];
+  let body = '';
+  if (F7.respTab === 'summary') {
+    body = (f.questions || []).filter(q => q.type !== 'header').map(q => {
+      const vals = ids.map(id => resp[id].answers && resp[id].answers[q.id]);
+      let inner = '';
+      if (isChoice7(q.type)) {
+        const counts = q.options.map((o, j) => vals.filter(v => q.type === 'cb' ? Array.isArray(v) && v.includes(j) : v !== undefined && v !== '' && Number(v) === j).length);
+        inner = q.options.map((o, j) => { const pct = n ? Math.round(counts[j] / n * 100) : 0; const ok = f.quiz && (q.correct || []).includes(j); return `<div class="v7-bar"><div class="v7-barlab">${ok ? '✓ ' : ''}${esc(o)}</div><div class="v7-bartrack"><i class="${ok ? 'ok' : ''}" style="width:${pct}%"></i></div><div class="v7-barnum">${counts[j]} · ${pct}%</div></div>`; }).join('');
+      } else if (q.type === 'scale') {
+        const nums = vals.map(Number).filter(x => x >= 1 && x <= 5); const avg = nums.length ? (nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(1) : '—';
+        inner = `<div class="tiny mb8">Average: <b class="gold">${avg}</b> / 5 (${nums.length} responses)</div>` + [1, 2, 3, 4, 5].map(k => { const c = nums.filter(x => x === k).length, pct = nums.length ? Math.round(c / nums.length * 100) : 0; return `<div class="v7-bar"><div class="v7-barlab">${k}</div><div class="v7-bartrack"><i style="width:${pct}%"></i></div><div class="v7-barnum">${c}</div></div>`; }).join('');
+      } else {
+        const rows = ids.map(id => ({ id, v: resp[id].answers && resp[id].answers[q.id] })).filter(x => x.v && String(x.v).trim());
+        inner = rows.length ? `<div class="v7-textlist">${rows.slice(0, 60).map(x => `<div class="v7-textrow"><span class="tiny muted">${esc(nameOf(x.id))}</span><div>${esc(x.v)}</div></div>`).join('')}</div>` : '<p class="tiny">No answers yet.</p>';
+      }
+      return `<section class="card"><b>${esc(q.text)}</b>${f.quiz && isGradable7(q) ? ` <span class="chip">${q.points || 0} pt</span>` : ''}<div class="mt12">${inner}</div></section>`;
+    }).join('') || '<p class="tiny">No questions.</p>';
+    if (f.quiz && n) { const tot = ids.reduce((a, id) => a + (resp[id].score || 0), 0), mx = (resp[ids[0]] || {}).max || 0; body = `<section class="card gold-b"><div class="tiny">Class average</div><div class="disp neon" style="font-size:34px">${mx ? (tot / n).toFixed(1) + ' / ' + mx : '—'}</div></section>` + body; }
+  } else if (F7.respTab === 'individual') {
+    body = ids.length ? `<div class="stack">${ids.sort((a, b) => nameOf(a).localeCompare(nameOf(b))).map(id => { const r = resp[id]; const g = gradeForm7(f, r.answers || {}); return `<details class="card v7-ind"><summary><b>${esc(nameOf(id))}</b> <span class="tiny muted">${new Date(r.at).toLocaleString()}</span>${f.quiz && r.max ? `<span class="chip gold" style="float:right">${r.score}/${r.max}</span>` : ''}</summary><div class="stack mt12">${(f.questions || []).filter(q => q.type !== 'header').map(q => `<div class="v7-rev ${g.detail[q.id] === true ? 'ok' : g.detail[q.id] === false ? 'no' : ''}"><b>${esc(q.text)}</b><div class="tiny mt4">${esc(answerText7(q, (r.answers || {})[q.id]))}</div></div>`).join('')}<button class="btn slate sm" onclick="f7clearResp('${f.id}','${id}')">↺ Let ${esc(nameOf(id))} retry</button></div></details>`; }).join('')}</div>` : '<p class="tiny">No responses yet.</p>';
+  } else {
+    const miss = state.students.filter(s => !resp[s.id]).sort((a, b) => a.name.localeCompare(b.name));
+    body = miss.length ? `<div class="v7-chips">${miss.map(s => `<span class="v7-pill">${esc(s.name)}</span>`).join('')}</div>` : '<p class="tiny">🎉 Everyone has responded!</p>';
+  }
+  return `<div class="stack"><div class="flex jb ac fw gap8"><button class="btn slate sm" onclick="f7cancel()">← Back to forms</button><div class="flex fw gap8"><button class="btn slate sm" onclick="f7edit('${f.id}')">✏️ Edit form</button><button class="btn blue sm" onclick="f7csv('${f.id}')">⬇ Download CSV</button>${f.status === 'open' ? `<button class="btn slate sm" onclick="f7status('${f.id}','closed')">⏹ Close</button>` : `<button class="btn green sm" onclick="f7status('${f.id}','open')">▶ Open</button>`}</div></div><section class="card"><span class="chip gold">RESPONSES</span><h3 class="ctitle disp mt8">${esc(f.title)}</h3><p class="tiny mt4"><b>${n}</b> of ${state.students.length} students responded · ${f.status === 'open' ? 'Open' : 'Closed'}</p><div class="tabs mt12">${tabs.map(([k, l]) => `<button class="tab ${F7.respTab === k ? 'active' : ''}" onclick="f7rtab('${k}')">${l}</button>`).join('')}</div></section>${body}</div>`;
+}
+async function f7clearResp(fid, sid) { const r = await mutate(st => { const f = ensureForms(st).find(x => x.id === fid); if (f && f.responses) delete f.responses[sid]; return { ok: true }; }); if (r && r.error) return showToast(explainError(r), 'error'); showToast('Student can fill it out again.', 'success'); paintTeacher7(true); }
+function f7csv(id) {
+  const f = (state.settings.forms || []).find(x => x.id === id); if (!f) return;
+  const qs = (f.questions || []).filter(q => q.type !== 'header'), cell = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const rows = [['Student', 'Submitted', ...qs.map(q => q.text), ...(f.quiz ? ['Score', 'Out of'] : [])]];
+  state.students.slice().sort((a, b) => a.name.localeCompare(b.name)).forEach(s => { const r = (f.responses || {})[s.id]; if (!r) return; rows.push([s.name, new Date(r.at).toLocaleString(), ...qs.map(q => answerText7(q, (r.answers || {})[q.id])), ...(f.quiz ? [r.score, r.max] : [])]); });
+  const blob = new Blob(['﻿' + rows.map(r => r.map(cell).join(',')).join('\r\n')], { type: 'text/csv' }), a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = (f.title || 'form').replace(/[^\w\-]+/g, '_') + '-responses.csv'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+/* ---------- Weekly Brain Boost: visual question editor ---------- */
+function wqInit7() {
+  if (F7.wq) return;
+  const saved = state.settings.weeklyQuiz || {}, legacy = saved.bankVersion !== 2;
+  const bank = !legacy && Array.isArray(saved.questionBank) && saved.questionBank.length ? saved.questionBank : (typeof WEEKLY_QUESTION_STARTER !== 'undefined' ? WEEKLY_QUESTION_STARTER : []);
+  F7.wq = clone7(bank).map(q => ({ question: q.question || '', choices: (q.choices || []).slice(0, 4).concat(['', '', '', '']).slice(0, 4), correctIndex: Number.isInteger(Number(q.correctIndex)) ? Number(q.correctIndex) : 0 }));
+}
+function renderTeacherWeeklyQuizHTML() {
+  wqInit7();
+  const saved = state.settings.weeklyQuiz || {}, legacy = saved.bankVersion !== 2;
+  const defFocus = 'Easy Grade 7 basics: pushes and pulls, gravity, friction, balanced and unbalanced forces, speed, position, and simple distance-time graphs. Use short questions and one-step thinking only.';
+  const unit = F7.wqUnit != null ? F7.wqUnit : (legacy ? 'Forces and Motion: Easy Basics' : (saved.unit || 'Forces and Motion: Easy Basics'));
+  const focus = F7.wqFocus != null ? F7.wqFocus : (legacy ? defFocus : (saved.focus || defFocus));
+  const published = saved.schemaVersion === 2 && saved.weekId === weeklyWeekKey() && Array.isArray(saved.questions) && saved.questions.length === 10;
+  const L = ['A', 'B', 'C', 'D'];
+  const cards = F7.wq.map((q, i) => `<div class="v7-qcard" id="wq-${i}"><div class="flex ac gap8"><span class="chip">${i + 1}</span><input class="field f1" maxlength="300" placeholder="Question" value="${esc(q.question)}" oninput="F7.wq[${i}].question=this.value"><button class="v7-ib bad" title="Delete" onclick="wqDel(${i})">🗑</button></div><div class="v7-optlist mt8">${q.choices.map((c, j) => `<div class="v7-optrow"><label class="v7-radio" title="Correct answer"><input type="radio" name="wqc${i}" ${q.correctIndex === j ? 'checked' : ''} onchange="F7.wq[${i}].correctIndex=${j}"><span>${L[j]}</span></label><input class="field" maxlength="200" placeholder="Choice ${L[j]}" value="${esc(c)}" oninput="F7.wq[${i}].choices[${j}]=this.value"></div>`).join('')}</div><div class="tiny muted mt4">Tap the letter circle to mark the correct answer.</div></div>`).join('');
+  return `<div class="weekly-teacher-grid"><section class="card weekly-setup-card"><span class="chip gold">WEEKLY SCIENCE QUIZ</span><h3 class="ctitle disp mt8">Set this week’s unit</h3><p class="tiny mt8">Write the unit and focus, add questions on the right, then publish. 10 random questions are picked each week; each student gets one attempt, and a perfect score earns one star.</p><label class="tiny b mt12" for="weekly-unit">Unit title</label><input id="weekly-unit" class="field mt4" maxlength="90" value="${esc(unit)}" oninput="F7.wqUnit=this.value" placeholder="e.g. Forces and Newton’s Laws"><label class="tiny b mt12" for="weekly-focus">Learning focus / standards</label><textarea id="weekly-focus" class="field mt4" rows="3" maxlength="500" oninput="F7.wqFocus=this.value" placeholder="What should students know this week?">${esc(focus)}</textarea>${published ? `<div class="weekly-published mt12">✅ Published for ${esc(saved.weekId)} · ${esc(saved.unit || 'Weekly science')}</div>` : '<div class="weekly-published mt12 muted">No quiz published for ' + esc(weeklyWeekKey()) + '.</div>'}<div class="flex fw gap8 mt12"><button class="btn goldb" onclick="publishWeeklyQuiz()">📚 Publish this week’s 10</button><button class="btn purple" onclick="copyWeeklyAiPrompt()">✨ Copy AI prompt</button></div><textarea id="weekly-ai-prompt" class="field mt12 hide" rows="7" readonly aria-label="AI prompt to copy"></textarea><div id="weekly-quiz-error" class="notice bad mt12 hide" role="alert"></div><details class="mt16 v7-import"><summary class="tiny b">📥 Paste questions from an AI (JSON)</summary><textarea id="weekly-import" class="field mt8" rows="6" spellcheck="false" placeholder='[{"question":"...","choices":["...","...","...","..."],"correctIndex":0}]'></textarea><button class="btn slate sm mt8" onclick="wqImport()">Add these to my question list</button></details></section><section class="card weekly-bank-card"><div class="flex jb ac fw gap8"><div><span class="chip">QUESTION BANK</span><h3 class="ctitle disp mt8">Your questions</h3></div><span class="tiny ${F7.wq.length >= 10 ? 'gold' : ''}"><b>${F7.wq.length}</b> questions · need 10+</span></div><div class="stack mt12" id="wq-list">${cards}</div><div class="flex fw gap8 mt12"><button class="btn purple" onclick="wqAdd()">➕ Add question</button><button class="btn slate" onclick="wqReset()">↺ Reset to starter bank</button></div></section></div>`;
+}
+function wqAdd() { F7.wq.push({ question: '', choices: ['', '', '', ''], correctIndex: 0 }); paintTeacher7(true); const el = $('wq-' + (F7.wq.length - 1)); if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); const i = el.querySelector('input.field'); if (i) i.focus(); } }
+function wqDel(i) { F7.wq.splice(i, 1); paintTeacher7(true); }
+function wqReset() { askConfirm('Replace your list with the starter questions?', () => { F7.wq = null; wqInit7(); const s = state.settings.weeklyQuiz; F7.wq = clone7(typeof WEEKLY_QUESTION_STARTER !== 'undefined' ? WEEKLY_QUESTION_STARTER : []).map(q => ({ question: q.question, choices: q.choices.slice(0, 4), correctIndex: q.correctIndex })); paintTeacher7(true); }); }
+function wqImport() {
+  const err = $('weekly-quiz-error'); err.classList.add('hide');
+  let input; try { input = JSON.parse(($('weekly-import').value || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')); if (!Array.isArray(input)) input = input && input.questions; if (!Array.isArray(input)) throw 0; } catch (e) { err.textContent = 'That is not a valid JSON list of questions.'; err.classList.remove('hide'); return; }
+  const ok = input.map(q => ({ question: String(q.question || '').trim(), choices: Array.isArray(q.choices) ? q.choices.slice(0, 4).map(x => String(x).trim()) : [], correctIndex: Number(q.correctIndex) })).filter(q => q.question && q.choices.length === 4 && q.choices.every(Boolean) && q.correctIndex >= 0 && q.correctIndex <= 3);
+  if (!ok.length) { err.textContent = 'No valid questions found (need question, 4 choices, correctIndex 0–3).'; err.classList.remove('hide'); return; }
+  F7.wq.push(...ok); showToast('Added ' + ok.length + ' questions.', 'success'); paintTeacher7(true);
+}
+function publishWeeklyQuiz() {
+  const error = $('weekly-quiz-error'); if (error) error.classList.add('hide');
+  const fail = m => { if (error) { error.textContent = m; error.classList.remove('hide'); } };
+  const unit = ($('weekly-unit') || {}).value ? $('weekly-unit').value.trim() : '', focus = ($('weekly-focus') || {}).value ? $('weekly-focus').value.trim() : '';
+  if (!unit || !focus) return fail('Add a unit title and learning focus before publishing.');
+  const bank = F7.wq.map((q, i) => ({ id: 'q' + (i + 1), question: q.question.trim(), choices: q.choices.map(x => String(x).trim()), correctIndex: Number(q.correctIndex) }));
+  const bad = bank.findIndex(q => !q.question || q.choices.some(x => !x) || !(q.correctIndex >= 0 && q.correctIndex <= 3));
+  if (bad >= 0) { const el = $('wq-' + bad); if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' }); return fail('Question ' + (bad + 1) + ' needs a question, four choices and a correct answer.'); }
+  if (bank.length < 10 || bank.length > 100) return fail('Add at least 10 questions (up to 100) so a random 10 can be picked.');
+  const questions = shuffleWeekly(bank).slice(0, 10);
+  Promise.resolve(mutate(st => { st.settings.weeklyQuiz = { schemaVersion: 2, bankVersion: 2, unit, focus, weekId: weeklyWeekKey(), questionBank: bank, questions, publishedAt: Date.now() }; addLog(st, '🧠', 'Teacher published the weekly science quiz: ' + unit); return { ok: true }; })).then(r => { if (r && r.error) return fail('Could not publish. Check the connection and try again.'); F7.wq = null; F7.wqUnit = null; F7.wqFocus = null; showToast('Published 10 random questions for this week!', 'success'); renderView('teacher-dashboard'); });
+}
+
+/* ===================== GROUPS / PARTNERS / PROJECTS (teacher) ===================== */
+const G7 = { core: null, step: 1, loading: false, other: null, absent: new Set(), filter: '', kind: 'partners', size: 3, countMode: 'size', count: 4, method: 'random', avoid: true, name: '', groups: [], unassigned: [], editId: null, reveal: false };
+const TEAM_NAMES = [['🚀', 'Comet Crew'], ['🦊', 'Fox Force'], ['🐉', 'Dragon Squad'], ['⚡', 'Thunder Bolts'], ['🌊', 'Wave Riders'], ['🔥', 'Blaze Team'], ['🦅', 'Sky Hawks'], ['🐺', 'Wolf Pack'], ['🌟', 'Star Seekers'], ['🛡️', 'Shield Guard'], ['🦈', 'Shark Attack'], ['🪐', 'Galaxy Gang'], ['🐯', 'Tiger Tribe'], ['🧊', 'Ice Breakers'], ['🌋', 'Lava Legends'], ['🦄', 'Unicorn Unit']];
+const TEAM_COLORS = ['#a78bfa', '#60a5fa', '#34d399', '#fbbf24', '#fb7185', '#f97316', '#22d3ee', '#e879f9'];
+const TEAM_EMOJI = ['🚀', '🦊', '🐉', '⚡', '🌊', '🔥', '🦅', '🐺', '🌟', '🛡️', '🦈', '🪐', '🐯', '🧊', '🌋', '🦄', '🐼', '🎯', '👾', '🏆'];
+const TEAM_MAX = 8;
+const KIND_INFO = { partners: ['🤝', 'Partners'], project: ['📚', 'Project groups'], team: ['🚀', 'Class teams'] };
+const g7shuffle = a => { const o = a.slice(); for (let i = o.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [o[i], o[j]] = [o[j], o[i]]; } return o; };
+
+function ensureGroups(st) { st.settings = st.settings || {}; if (!Array.isArray(st.settings.groupSets)) st.settings.groupSets = []; return st.settings.groupSets; }
+
+/* ---- core data access (current core is live; other cores are loaded on demand) ---- */
+function g7students() { return G7.core === Cloud.room ? state.students : ((G7.other && G7.other.students) || []); }
+function g7settings() { return G7.core === Cloud.room ? state.settings : ((G7.other && G7.other.settings) || {}); }
+async function g7loadCore(room) {
+  G7.loading = true; paintTeacher7(true);
+  let data = null;
+  try { if (window.CloudReadCores) { const r = await window.CloudReadCores([room]); if (!r.error && Array.isArray(r.data) && r.data[0] && r.data[0].json) data = r.data[0].json; } } catch (e) { }
+  if (!data) { try { const raw = localStorage.getItem('StarCentral_V4_' + room), d = raw && JSON.parse(raw); if (d && Array.isArray(d.students)) data = d; } catch (e) { } }
+  G7.other = { students: (data && data.students) || [], settings: (data && data.settings) || {} }; G7.loading = false;
+  g7prefillAbsent(); if (ui.view === 'teacher-dashboard' && ui.tab === 'groups') paintTeacher7(true);
+}
+async function g7writeRoom(room, fn) {
+  if (room === Cloud.room) return mutate(fn);
+  if (window.CloudMutateRoom) { const r = await window.CloudMutateRoom(room, fn); const res = r.result || { ok: true }; if (!res.error && r.st && G7.other) { G7.other.settings = r.st.settings || {}; G7.other.students = r.st.students || G7.other.students; } return res; }
+  return { error: 'offline' };
+}
+function g7prefillAbsent() { const a = (g7settings().attendance) || {}; const ids = new Set(g7students().map(s => s.id)); G7.absent = new Set(a.date === today7() ? (a.absentIds || []).filter(id => ids.has(id)) : []); }
+function g7init() { if (!G7.core) { G7.core = Cloud.room; g7prefillAbsent(); } }
+function g7pickCore(room) { if (room === G7.core) return; G7.core = room; G7.step = 1; G7.groups = []; G7.unassigned = []; G7.editId = null; if (room === Cloud.room) { g7prefillAbsent(); paintTeacher7(true); } else { G7.other = null; G7.absent = new Set(); g7loadCore(room); } }
+
+/* ---- grouping algorithms ---- */
+function g7calcK(n, size) { if (n <= size) return 1; if (size === 2) return Math.max(1, Math.floor(n / 2)); const rem = n % size; if (rem === 0) return n / size; return rem >= Math.ceil(size / 2) ? Math.ceil(n / size) : Math.max(1, Math.floor(n / size)); }
+function g7sizes(n, k) { const base = Math.floor(n / k), extra = n % k; return Array.from({ length: k }, (_, i) => base + (i < extra ? 1 : 0)); }
+function g7history() { const h = {}; (g7settings().groupSets || []).filter(s => s.kind !== 'team' && s.id !== G7.editId).forEach(s => (s.groups || []).forEach(g => { const m = g.memberIds || []; for (let i = 0; i < m.length; i++)for (let j = i + 1; j < m.length; j++) { const k = [m[i], m[j]].sort().join('|'); h[k] = (h[k] || 0) + 1; } })); return h; }
+function g7repeat(groups, hist) { let sc = 0; groups.forEach(g => { for (let i = 0; i < g.length; i++)for (let j = i + 1; j < g.length; j++) sc += hist[[g[i], g[j]].sort().join('|')] || 0; }); return sc; }
+function g7makeRandom(ids, k, avoid) { const sizes = g7sizes(ids.length, k), hist = avoid ? g7history() : {}; let best = null, bs = Infinity; for (let t = 0; t < (avoid ? 300 : 1); t++) { const sh = g7shuffle(ids), gs = []; let p = 0; sizes.forEach(s => { gs.push(sh.slice(p, p + s)); p += s; }); const sc = avoid ? g7repeat(gs, hist) : 0; if (sc < bs) { bs = sc; best = gs; } if (bs === 0) break; } return best; }
+function g7makeBalanced(ids, k, avoid) {
+  const sizes = g7sizes(ids.length, k), hist = avoid ? g7history() : {}, st = {}; g7students().forEach(s => st[s.id] = s.totalEarned | 0);
+  const vals = ids.map(i => st[i] || 0), spread = Math.max(1, Math.max(...vals) - Math.min(...vals)); let best = null, bs = Infinity;
+  for (let t = 0; t < (avoid ? 200 : 12); t++) {
+    const sorted = ids.map(id => ({ id, v: (st[id] || 0) + Math.random() * spread * 0.25 })).sort((a, b) => b.v - a.v), gs = Array.from({ length: k }, () => []); let i = 0, r = 0;
+    while (i < sorted.length) { const order = r % 2 ? [...Array(k).keys()].reverse() : [...Array(k).keys()]; for (const g of order) { if (i < sorted.length && gs[g].length < sizes[g]) gs[g].push(sorted[i++].id); } r++; }
+    const tot = gs.map(g => g.reduce((a, id) => a + (st[id] || 0), 0)), mean = tot.reduce((a, b) => a + b, 0) / k, varr = tot.reduce((a, b) => a + (b - mean) ** 2, 0) / k;
+    const sc = (avoid ? g7repeat(gs, hist) * 1000 : 0) + varr; if (sc < bs) { bs = sc; best = gs; }
+  }
+  return best;
+}
+function g7defaultName(kind, i) { if (kind === 'team') { const t = TEAM_NAMES[i % TEAM_NAMES.length]; return { name: t[1] + (i >= TEAM_NAMES.length ? ' ' + (Math.floor(i / TEAM_NAMES.length) + 1) : ''), emoji: t[0] }; } return { name: (kind === 'partners' ? 'Pair ' : 'Group ') + (i + 1), emoji: kind === 'partners' ? '🤝' : '📚' }; }
+function g7generate() {
+  const present = g7students().filter(s => !G7.absent.has(s.id)).map(s => s.id), n = present.length;
+  if (n < 2) return showToast('You need at least 2 students who are here.', 'info');
+  const kind = G7.kind, size = kind === 'partners' ? 2 : Math.max(2, Math.min(8, Number(G7.size) || 3));
+  let k = (kind !== 'partners' && G7.countMode === 'count') ? Math.max(1, Math.min(n, Number(G7.count) || 2)) : g7calcK(n, size);
+  let lists;
+  if (G7.method === 'manual') { lists = Array.from({ length: k }, () => []); G7.unassigned = present; }
+  else { lists = G7.method === 'balanced' ? g7makeBalanced(present, k, G7.avoid) : g7makeRandom(present, k, G7.avoid); G7.unassigned = []; }
+  G7.groups = lists.map((m, i) => ({ id: uid7('g'), ...g7defaultName(kind, i), memberIds: m }));
+  G7.step = 3; G7.reveal = G7.method !== 'manual'; G7.editId = null; paintTeacher7(); window.scrollTo(0, 0); setTimeout(() => { G7.reveal = false; }, (G7.groups.length * 330) + 900);
+  if (G7.reveal) { let c = 0; const iv = setInterval(() => { sfx('pop'); if (++c >= Math.min(G7.groups.length, 10)) { clearInterval(iv); setTimeout(() => { try { celebrate(); sfx('star'); } catch (e) { } }, 250); } }, 330); }
+}
+function g7move(sid, target) {
+  G7.groups.forEach(g => g.memberIds = g.memberIds.filter(x => x !== sid)); G7.unassigned = G7.unassigned.filter(x => x !== sid); G7.absent.delete(sid);
+  if (target === 'un') G7.unassigned.push(sid); else if (target === 'absent') G7.absent.add(sid); else { const g = G7.groups.find(x => x.id === target); if (g) g.memberIds.push(sid); else G7.unassigned.push(sid); }
+  G7.reveal = false; paintTeacher7(true);
+}
+function g7addGroup() { const i = G7.groups.length; G7.groups.push({ id: uid7('g'), ...g7defaultName(G7.kind, i), memberIds: [] }); G7.reveal = false; paintTeacher7(true); }
+function g7delGroup(id) { const g = G7.groups.find(x => x.id === id); if (!g) return; G7.unassigned.push(...g.memberIds); G7.groups = G7.groups.filter(x => x.id !== id); G7.reveal = false; paintTeacher7(true); }
+function g7rename(id, v) { const g = G7.groups.find(x => x.id === id); if (g) g.name = v; }
+function g7abs(id) { if (G7.absent.has(id)) G7.absent.delete(id); else G7.absent.add(id); const b = document.querySelector(`.v7-stu[data-id="${CSS.escape(id)}"]`); if (b) b.classList.toggle('abs', G7.absent.has(id)); g7counts(); }
+function g7counts() { const n = g7students().length, a = [...G7.absent].filter(id => g7students().some(s => s.id === id)).length, el = $('g7-counts'); if (el) el.innerHTML = `<b class="green">${n - a} here</b> · <b class="${a ? 'gold' : ''}">${a} absent</b> · ${n} total`; }
+function g7filter(v) { v = v.trim().toLowerCase(); document.querySelectorAll('.v7-stu').forEach(b => { b.style.display = (b.dataset.name || '').includes(v) ? '' : 'none'; }); }
+function g7none() { G7.absent = new Set(); document.querySelectorAll('.v7-stu').forEach(b => b.classList.remove('abs')); g7counts(); }
+async function g7confirmAttendance() {
+  const students = g7students(); if (!students.length) return showToast('This core has no students yet.', 'error');
+  const ids = [...G7.absent].filter(id => students.some(s => s.id === id)), date = today7();
+  const r = await g7writeRoom(G7.core, st => { st.settings = st.settings || {}; st.settings.attendance = { date, absentIds: ids, at: Date.now() }; return { ok: true }; });
+  if (r && r.error) return showToast('Could not save attendance, but you can still continue.', 'info');
+  G7.step = 2; paintTeacher7(); window.scrollTo(0, 0);
+}
+function g7set(k, v) { G7[k] = v; }
+function g7opt(k, v) { G7[k] = v; paintTeacher7(true); }
+async function g7assign() {
+  const unassigned = G7.unassigned.filter(id => g7students().some(s => s.id === id));
+  const go = async () => {
+    const groups = G7.groups.filter(g => g.memberIds.length).map(g => ({ id: g.id, name: (g.name || '').trim() || 'Group', emoji: g.emoji, memberIds: g.memberIds.slice() }));
+    if (!groups.length) return showToast('Add students to at least one group first.', 'info');
+    const kind = G7.kind, core = G7.core, absentIds = [...G7.absent], editId = G7.editId, nm = (G7.name || '').trim() || (KIND_INFO[kind][1] + ' · ' + new Date().toLocaleDateString([], { month: 'short', day: 'numeric' }));
+    const r = await g7writeRoom(core, st => { const sets = ensureGroups(st); if (editId) { const s = sets.find(x => x.id === editId); if (s) { s.groups = groups; s.absentIds = absentIds; s.name = nm; s.updatedAt = Date.now(); return { ok: true }; } } sets.forEach(s => { if (s.kind === kind) s.active = false; }); sets.unshift({ id: uid7('set'), kind, name: nm, core, date: today7(), createdAt: Date.now(), active: true, absentIds, groups }); st.settings.groupSets = sets.slice(0, 40); addLog(st, KIND_INFO[kind][0], 'Teacher assigned ' + KIND_INFO[kind][1].toLowerCase() + ': ' + nm); return { ok: true }; });
+    if (r && r.error) return showToast('Could not save. Check the connection and try again.', 'error');
+    showToast('Assigned! Students can see their group on the Teams page.', 'success'); celebrate(); sfx('star');
+    G7.step = 1; G7.groups = []; G7.unassigned = []; G7.editId = null; G7.name = ''; paintTeacher7(); window.scrollTo(0, 0);
+  };
+  if (unassigned.length) askConfirm(unassigned.length + ' student(s) are not in a group yet. Assign anyway?', go); else go();
+}
+function g7editSet(id) { const s = (g7settings().groupSets || []).find(x => x.id === id); if (!s) return; G7.kind = s.kind; G7.name = s.name; G7.groups = clone7(s.groups); G7.absent = new Set(s.absentIds || []); const inGroup = new Set(s.groups.flatMap(g => g.memberIds)); G7.unassigned = g7students().filter(x => !inGroup.has(x.id) && !G7.absent.has(x.id)).map(x => x.id); G7.editId = id; G7.step = 3; G7.reveal = false; paintTeacher7(); window.scrollTo(0, 0); }
+async function g7vis(id) { const r = await g7writeRoom(G7.core, st => { const s = ensureGroups(st).find(x => x.id === id); if (!s) return { error: 'missing' }; s.active = !s.active; return { ok: true }; }); if (r && r.error) return showToast('Could not update.', 'error'); paintTeacher7(true); }
+function g7del(id) { askConfirm('Delete this assignment?', async () => { const r = await g7writeRoom(G7.core, st => { st.settings.groupSets = ensureGroups(st).filter(x => x.id !== id); return { ok: true }; }); if (r && r.error) return showToast('Could not delete.', 'error'); paintTeacher7(true); }); }
+function g7nameOf(id) { const s = g7students().find(x => x.id === id) || state.students.find(x => x.id === id); return s ? s.name : 'Student'; }
+function g7show(id) {
+  const s = (g7settings().groupSets || []).find(x => x.id === id); if (!s) return;
+  openModal(`${modalHead(esc(s.name))}<p class="tiny mt8">${esc(s.core)} · ${esc(s.date || '')}</p><div class="v7-bigboard mt12">${s.groups.map(g => `<div class="v7-bigcard"><div class="v7-bigtitle">${esc(g.emoji || '')} ${esc(g.name)}</div>${g.memberIds.map(m => `<div class="v7-bigname">${esc(g7nameOf(m))}</div>`).join('')}</div>`).join('')}</div>${(s.absentIds || []).length ? `<p class="tiny mt12 muted">Absent: ${(s.absentIds || []).map(m => esc(g7nameOf(m))).join(', ')}</p>` : ''}`);
+}
+function g7copy(id) { const s = (g7settings().groupSets || []).find(x => x.id === id); if (!s) return; const txt = s.name + '\n' + s.groups.map(g => g.name + ': ' + g.memberIds.map(g7nameOf).join(', ')).join('\n'); try { navigator.clipboard.writeText(txt).then(() => showToast('Copied!', 'success')); } catch (e) { showToast('Copy not available here.', 'info'); } }
+
+function renderTeacherGroupsHTML() {
+  g7init();
+  const cores = ['CORE-1', 'CORE-2', 'CORE-3', 'CORE-4'], students = g7students(), sets = (g7settings().groupSets || []);
+  const stepper = `<div class="v7-steps">${[['1', 'Who’s here?'], ['2', 'Choose how'], ['3', 'Review & assign']].map(([n, l]) => `<div class="v7-step ${G7.step == n ? 'on' : G7.step > n ? 'done' : ''}"><span>${G7.step > n ? '✓' : n}</span>${l}</div>`).join('<i></i>')}</div>`;
+  const coreBar = `<div class="flex fw gap8 ac"><span class="tiny b">Core:</span>${cores.map(c => `<button class="btn sm ${G7.core === c ? 'goldb' : 'slate'}" onclick="g7pickCore('${c}')">${c.replace('CORE-', 'Core ')}${c === Cloud.room ? ' ★' : ''}</button>`).join('')}</div>`;
+  let panel = '';
+  if (G7.loading) panel = '<div class="tc tiny mt16">Loading that core’s roster…</div>';
+  else if (!students.length) panel = `<div class="notice mt16">No students in ${esc(G7.core)} yet. Add them from the Roster tab${G7.core !== Cloud.room ? ' (switch to that core first)' : ''}.</div>`;
+  else if (G7.step === 1) {
+    const sorted = students.slice().sort((a, b) => a.name.localeCompare(b.name));
+    panel = `<h3 class="ctitle disp mt16">Who is absent today?</h3><p class="tiny mt4">Tap every student who is <b>not</b> here. They’ll be left out of the groups.</p><div class="flex fw gap8 ac mt12"><input class="field f1" style="min-width:180px" placeholder="Search names…" oninput="g7filter(this.value)"><button class="btn slate sm" onclick="g7none()">✅ Nobody is absent</button></div><div class="v7-stugrid mt12">${sorted.map(s => `<button class="v7-stu ${G7.absent.has(s.id) ? 'abs' : ''}" data-id="${esc(s.id)}" data-name="${esc(s.name.toLowerCase())}" onclick="g7abs(this.dataset.id)"><span class="v7-stuav">${humanAvatar(s, 'mini')}</span><span class="v7-stun">${esc(s.name)}</span><span class="v7-stutag">ABSENT</span></button>`).join('')}</div><div class="flex jb ac fw gap8 mt16"><div class="tiny" id="g7-counts"></div><button class="btn goldb lg" onclick="g7confirmAttendance()">Confirm attendance →</button></div>`;
+  } else if (G7.step === 2) {
+    const present = students.length - [...G7.absent].filter(id => students.some(s => s.id === id)).length, k = G7.kind;
+    const kindBtn = key => `<button class="v7-choice ${k === key ? 'on' : ''}" onclick="g7opt('kind','${key}')"><span>${KIND_INFO[key][0]}</span><b>${KIND_INFO[key][1]}</b><em>${key === 'partners' ? 'Pairs of 2' : key === 'project' ? 'Small groups for a project' : 'Named teams on the Teams page'}</em></button>`;
+    const methBtn = (key, ic, t, d) => `<button class="v7-choice ${G7.method === key ? 'on' : ''}" onclick="g7opt('method','${key}')"><span>${ic}</span><b>${t}</b><em>${d}</em></button>`;
+    panel = `<div class="notice mt16">✅ <b>${present}</b> students here${students.length - present ? ` · <b>${students.length - present}</b> absent and left out` : ''} <button class="btn slate sm" style="margin-left:8px" onclick="g7opt('step',1)">Change attendance</button></div><h3 class="ctitle disp mt16">What are you making?</h3><div class="v7-choices mt8">${kindBtn('partners')}${kindBtn('project')}${kindBtn('team')}</div><label class="lbl mt16" for="g7-name">Name (optional)</label><input id="g7-name" class="field" maxlength="60" placeholder="${k === 'partners' ? 'e.g. Lab partners' : k === 'project' ? 'e.g. Ecosystem project' : 'e.g. Unit 3 teams'}" value="${esc(G7.name)}" oninput="G7.name=this.value">${k !== 'partners' ? `<div class="flex fw gap16 ac mt16"><div class="flex ac gap8"><span class="tiny b">Group by:</span><button class="btn sm ${G7.countMode === 'size' ? 'purple' : 'slate'}" onclick="g7opt('countMode','size')">Students per group</button><button class="btn sm ${G7.countMode === 'count' ? 'purple' : 'slate'}" onclick="g7opt('countMode','count')">Number of groups</button></div>${G7.countMode === 'size' ? `<label class="tiny flex ac gap8">Size <input type="number" min="2" max="8" class="field v7-pts" value="${G7.size}" oninput="G7.size=Number(this.value)"></label>` : `<label class="tiny flex ac gap8">Groups <input type="number" min="1" max="30" class="field v7-pts" value="${G7.count}" oninput="G7.count=Number(this.value)"></label>`}</div>` : '<p class="tiny mt8">An odd student out joins a pair, making one group of 3.</p>'}<h3 class="ctitle disp mt16">How should students be picked?</h3><div class="v7-choices mt8">${methBtn('random', '🎲', 'Random picker', 'Shuffled with a reveal')}${methBtn('balanced', '⚖️', 'Balanced mix', 'Spreads high and low star earners')}${methBtn('manual', '🧑‍🏫', 'I’ll choose', 'Start empty and place each student')}</div>${G7.method !== 'manual' ? `<label class="v7-switch mt12"><input type="checkbox" ${G7.avoid ? 'checked' : ''} onchange="G7.avoid=this.checked"><span>Avoid repeating past partners</span></label>` : ''}<div class="flex jb ac fw gap8 mt16"><button class="btn slate" onclick="g7opt('step',1)">← Back</button><button class="btn goldb lg" onclick="g7generate()">${G7.method === 'manual' ? '🧑‍🏫 Start placing students' : '🎲 Make the groups!'}</button></div>`;
+  } else {
+    const opts = (cur) => `<option value="">Move to…</option>${G7.groups.map(g => `<option value="${esc(g.id)}" ${g.id === cur ? 'disabled' : ''}>${esc((g.emoji || '') + ' ' + g.name)}</option>`).join('')}<option value="un">↩ Unassigned</option><option value="absent">🚫 Absent</option>`;
+    const sel = (sid, cur) => `<select class="v7-move" data-id="${esc(sid)}" onchange="if(this.value)g7move(this.dataset.id,this.value)">${opts(cur)}</select>`;
+    const un = G7.unassigned.filter(id => students.some(s => s.id === id)), abs = [...G7.absent].filter(id => students.some(s => s.id === id));
+    panel = `<div class="flex jb ac fw gap8 mt16"><div><h3 class="ctitle disp">${G7.editId ? 'Edit assignment' : 'Review the groups'}</h3><p class="tiny mt4">Move anyone with the dropdown, rename groups, then assign.</p></div><div class="flex fw gap8">${!G7.editId && G7.method !== 'manual' ? '<button class="btn pink sm" onclick="g7generate()">🔀 Reshuffle</button>' : ''}<button class="btn slate sm" onclick="g7addGroup()">➕ Add group</button></div></div>${un.length ? `<div class="v7-unassigned mt12"><b class="tiny">Not in a group yet (${un.length})</b><div class="v7-unlist mt8">${un.map(id => `<div class="v7-unrow"><span>${esc(g7nameOf(id))}</span>${sel(id, '')}</div>`).join('')}</div></div>` : ''}<div class="v7-groups mt12">${G7.groups.map((g, gi) => `<div class="v7-gcard ${G7.reveal ? 'pop' : ''}" style="--c:${TEAM_COLORS[gi % TEAM_COLORS.length]};animation-delay:${G7.reveal ? gi * 0.33 : 0}s"><div class="flex ac gap8"><span style="font-size:22px">${esc(g.emoji || '')}</span><input class="v7-gname" maxlength="32" value="${esc(g.name)}" data-id="${esc(g.id)}" oninput="g7rename(this.dataset.id,this.value)"><span class="chip">${g.memberIds.length}</span><button class="v7-x" title="Remove group" data-id="${esc(g.id)}" onclick="g7delGroup(this.dataset.id)">✕</button></div><div class="v7-members">${g.memberIds.length ? g.memberIds.map(id => `<div class="v7-mrow"><span>${esc(g7nameOf(id))}</span>${sel(id, g.id)}</div>`).join('') : '<div class="tiny muted">Empty</div>'}</div></div>`).join('')}</div>${abs.length ? `<div class="v7-unassigned mt16"><b class="tiny">🚫 Absent (${abs.length}) — arrived late? Add them to a group</b><div class="v7-unlist mt8">${abs.map(id => `<div class="v7-unrow"><span class="muted">${esc(g7nameOf(id))}</span>${sel(id, 'absent')}</div>`).join('')}</div></div>` : ''}<div class="flex jb ac fw gap8 mt16"><button class="btn slate" onclick="${G7.editId ? "G7.editId=null;g7opt('step',1)" : "g7opt('step',2)"}">← Back</button><button class="btn goldb lg" onclick="g7assign()">✅ ${G7.editId ? 'Save changes' : 'Assign to class'}</button></div>`;
+  }
+  const saved = sets.length ? `<section class="card"><h3 class="ctitle disp">Current assignments · ${esc(G7.core)}</h3><div class="stack mt12">${sets.map(s => `<div class="v7-set ${s.active ? '' : 'off'}"><div class="flex jb ac fw gap8"><div><b>${KIND_INFO[s.kind] ? KIND_INFO[s.kind][0] : ''} ${esc(s.name)}</b> <span class="chip ${s.active ? 'green' : ''}">${s.active ? 'Visible to students' : 'Hidden'}</span><div class="tiny mt4">${esc(s.date || '')} · ${s.groups.length} groups${(s.absentIds || []).length ? ' · ' + s.absentIds.length + ' absent' : ''}</div></div><div class="flex fw gap8"><button class="btn purple sm" onclick="g7show('${s.id}')">📺 Show</button><button class="btn slate sm" onclick="g7editSet('${s.id}')">✏️ Edit</button><button class="btn slate sm" onclick="g7copy('${s.id}')">📋 Copy</button><button class="btn slate sm" onclick="g7vis('${s.id}')">${s.active ? '🙈 Hide' : '👁 Show to students'}</button><button class="btn red sm" onclick="g7del('${s.id}')">🗑</button></div></div><div class="v7-chips mt8">${s.groups.map(g => `<span class="v7-pill" style="border-color:${TEAM_COLORS[s.groups.indexOf(g) % 8]}77"><b>${esc(g.name)}:</b> ${g.memberIds.map(m => esc(g7nameOf(m))).join(', ')}</span>`).join('')}</div></div>`).join('')}</div></section>` : '';
+  setTimeout(g7counts, 0);
+  return `<div class="stack"><section class="card"><div class="flex jb ac fw gap12"><div><span class="chip gold">GROUP MAKER</span><h3 class="ctitle disp mt8">Partners, projects & teams</h3><p class="tiny mt4">Pick a core, mark who’s absent, then assign by random picker, balanced mix, or by hand.</p></div>${coreBar}</div>${G7.loading ? '' : stepper}${panel}</section>${saved}</div>`;
+}
+
+/* ===================== TEAMS (students) ===================== */
+const T7 = { emoji: '🚀', color: TEAM_COLORS[0], editEmoji: null, editColor: null, search: '' };
+function teamColor7(t, i) { return t.color || TEAM_COLORS[(i || 0) % TEAM_COLORS.length]; }
+function allTeams7() {
+  const cfg = ensureTeamSettings(state), out = [];
+  cfg.teams.forEach((t, i) => { const mem = (t.memberIds || []).filter(id => state.students.some(s => s.id === id)); out.push({ id: t.id, name: t.name, emoji: t.emoji || '🚀', color: teamColor7(t, i), motto: t.motto || '', captainId: mem.includes(t.captainId) ? t.captainId : mem[0], memberIds: mem, allianceId: t.allianceId, official: false }); });
+  (state.settings.groupSets || []).filter(s => s.kind === 'team' && s.active).forEach(s => s.groups.forEach((g, i) => { const mem = g.memberIds.filter(id => state.students.some(x => x.id === id)); if (mem.length) out.push({ id: 'ct-' + g.id, name: g.name, emoji: g.emoji || '🚀', color: TEAM_COLORS[i % 8], motto: '', captainId: null, memberIds: mem, allianceId: null, official: true }); }));
+  out.forEach(t => { const ms = t.memberIds.map(id => state.students.find(s => s.id === id)); t.total = ms.reduce((a, s) => a + (s.totalEarned | 0), 0); t.avg = ms.length ? t.total / ms.length : 0; });
+  out.sort((a, b) => b.avg - a.avg || b.total - a.total || a.name.localeCompare(b.name)); out.forEach((t, i) => t.rank = i + 1); return out;
+}
+const av7 = s => `<span class="v7-av">${humanAvatar(s, 'mini')}</span>`;
+function memberRow7(t, sid, me, canManage) {
+  const s = state.students.find(x => x.id === sid); if (!s) return '';
+  const lv = levelInfo(s.totalEarned).cur, isCap = t.captainId === sid;
+  return `<div class="v7-mem">${av7(s)}<div class="f1"><b>${esc(s.name)}</b>${isCap ? ' <span title="Captain">👑</span>' : ''}${me && me.id === sid ? ' <span class="chip">You</span>' : ''}<div class="tiny muted">${lv.icon} ${esc(lv.name)} · ⭐ ${s.totalEarned | 0}</div></div>${canManage && !t.official ? `<div class="flex gap8">${!isCap && t.captainId ? `<button class="v7-ib" title="Make captain" data-t="${esc(t.id)}" data-s="${esc(sid)}" onclick="makeCaptain(this.dataset.t,this.dataset.s)">👑</button>` : ''}${sid !== (me && me.id) || ui.teacher ? `<button class="v7-ib bad" title="Remove from team" data-t="${esc(t.id)}" data-s="${esc(sid)}" onclick="kickMember(this.dataset.t,this.dataset.s)">✕</button>` : ''}</div>` : ''}</div>`;
+}
+function emojiPick7(cur, kind) { return `<div class="v7-emojis" data-kind="${kind}">${TEAM_EMOJI.map(e => `<button type="button" class="v7-em ${e === cur ? 'on' : ''}" onclick="pickTeamLook('${kind}','emoji','${e}',this)">${e}</button>`).join('')}</div>`; }
+function colorPick7(cur, kind) { return `<div class="v7-colors">${TEAM_COLORS.map(c => `<button type="button" class="v7-co ${c === cur ? 'on' : ''}" style="background:${c}" aria-label="Team color" onclick="pickTeamLook('${kind}','color','${c}',this)"></button>`).join('')}</div>`; }
+function pickTeamLook(kind, what, val, el) { if (kind === 'new') T7[what] = val; else T7[what === 'emoji' ? 'editEmoji' : 'editColor'] = val; if (el) { el.parentNode.querySelectorAll('button').forEach(b => b.classList.remove('on')); el.classList.add('on'); } }
+function teamFilter7(v) { T7.search = v; const q = v.trim().toLowerCase(); document.querySelectorAll('.v7-tcard').forEach(c => { c.style.display = (c.dataset.name || '').includes(q) ? '' : 'none'; }); }
+
+function myAssignments7(me) {
+  if (!me) return '';
+  const mine = (state.settings.groupSets || []).filter(s => s.active && s.kind !== 'team').map(s => ({ s, g: s.groups.find(g => g.memberIds.includes(me.id)) })).filter(x => x.g);
+  const teamMine = (state.settings.groupSets || []).filter(s => s.active && s.kind === 'team').map(s => ({ s, g: s.groups.find(g => g.memberIds.includes(me.id)) })).filter(x => x.g);
+  if (!mine.length && !teamMine.length) return '';
+  const card = ({ s, g }) => { const others = g.memberIds.filter(id => id !== me.id); return `<article class="v7-assign" style="--c:${TEAM_COLORS[s.groups.indexOf(g) % 8]}"><div class="flex jb ac fw gap8"><span class="chip gold">${KIND_INFO[s.kind][0]} ${s.kind === 'partners' ? 'YOUR PARTNER' : s.kind === 'team' ? 'YOUR CLASS TEAM' : 'YOUR PROJECT GROUP'}</span><span class="tiny muted">${esc(s.name)}</span></div><h3 class="ctitle disp mt8">${esc(g.emoji || '')} ${esc(g.name)}</h3><div class="v7-memgrid mt12">${others.length ? others.map(id => { const o = state.students.find(x => x.id === id); return o ? `<div class="v7-mem">${av7(o)}<b>${esc(o.name)}</b></div>` : ''; }).join('') : '<p class="tiny">You’re on your own in this one.</p>'}</div></article>`; };
+  return `<section class="card"><h2 class="ctitle disp">📌 Assigned by your teacher</h2><div class="stack mt12">${[...mine, ...teamMine].map(card).join('')}</div></section>`;
+}
+function renderTeamsView() {
+  const cfg = ensureTeamSettings(state), alliances = cfg.alliances, me = activeStudent(), teams = allTeams7();
+  const mine = me && teams.find(t => !t.official && t.memberIds.includes(me.id)), myClass = me && teams.find(t => t.official && t.memberIds.includes(me.id));
+  const myAlliance = mine && alliances.find(a => a.id === mine.allianceId), teacher = !!ui.teacher;
+  const tname = id => { const t = teams.find(x => x.id === id); return t ? esc(t.emoji + ' ' + t.name) : 'Team'; };
+  /* hero for my team */
+  let hero = '';
+  if (mine) {
+    const isCap = mine.captainId === me.id;
+    hero = `<section class="v7-hero" style="--c:${mine.color}"><div class="v7-heroTop"><div class="v7-heroEmoji">${esc(mine.emoji)}</div><div class="f1"><span class="chip">YOUR TEAM</span><h2 class="disp v7-heroName">${esc(mine.name)}</h2>${mine.motto ? `<p class="v7-motto">“${esc(mine.motto)}”</p>` : ''}</div><div class="flex fw gap8">${isCap ? '<button class="btn slate sm" onclick="openTeamEdit()">✏️ Edit team</button>' : ''}<button class="btn slate sm" onclick="leaveTeam()">Leave</button></div></div><div class="v7-tiles"><div class="v7-tile"><span>⭐ Team stars</span><b>${mine.total}</b></div><div class="v7-tile"><span>📊 Avg per member</span><b>${mine.avg.toFixed(1)}</b></div><div class="v7-tile"><span>🏆 Class rank</span><b>#${mine.rank}<small> / ${teams.length}</small></b></div><div class="v7-tile"><span>👥 Members</span><b>${mine.memberIds.length}<small> / ${TEAM_MAX}</small></b></div></div><div class="v7-memlist">${mine.memberIds.map(id => memberRow7(mine, id, me, isCap)).join('')}</div></section>`;
+  }
+  /* create / join */
+  const creator = me && !mine ? `<section class="card"><h2 class="ctitle disp">Start your own team</h2><p class="tiny mt4">Pick a look, name it, and invite friends to join.</p><div class="cols-2 mt12"><div><label class="lbl" for="team-name">Team name</label><input class="field" id="team-name" maxlength="32" placeholder="e.g. Comet Crew"><label class="lbl mt12" for="team-motto">Motto (optional)</label><input class="field" id="team-motto" maxlength="60" placeholder="e.g. Together we shine"><button class="btn purple mt12" onclick="createTeam()">✨ Create team</button></div><div><label class="lbl">Team emoji</label>${emojiPick7(T7.emoji, 'new')}<label class="lbl mt12">Team color</label>${colorPick7(T7.color, 'new')}</div></div></section>` : '';
+  /* leaderboard */
+  const podium = teams.slice(0, 3), medals = ['🥇', '🥈', '🥉'];
+  const board = teams.length ? `<section class="card"><h2 class="ctitle disp">🏆 Team leaderboard</h2><p class="tiny mt4">Ranked by average lifetime stars per member, so small and big teams compete fairly.</p><div class="v7-podium mt12">${podium.map((t, i) => `<div class="v7-pod p${i}" style="--c:${t.color}"><div class="v7-podm">${medals[i]}</div><div class="v7-pode">${esc(t.emoji)}</div><b>${esc(t.name)}</b><div class="tiny">${t.avg.toFixed(1)} avg · ${t.total} ⭐</div></div>`).join('')}</div>${teams.length > 3 ? `<div class="stack mt12">${teams.slice(3).map(t => `<div class="v7-lrow" style="--c:${t.color}"><span class="v7-rk">#${t.rank}</span><span style="font-size:22px">${esc(t.emoji)}</span><b class="f1">${esc(t.name)}${t.official ? ' <span class="chip">Class team</span>' : ''}</b><span class="tiny">${t.avg.toFixed(1)} avg · ${t.total} ⭐ · ${t.memberIds.length} 👥</span></div>`).join('')}</div>` : ''}</section>` : '';
+  /* browse */
+  const browse = teams.length ? `<section class="card"><div class="flex jb ac fw gap8"><h2 class="ctitle disp">Teams in this class</h2><input class="field" style="max-width:220px" placeholder="🔍 Search teams" value="${esc(T7.search)}" oninput="teamFilter7(this.value)"></div><div class="cols-3 mt12">${teams.map(t => { const full = t.memberIds.length >= TEAM_MAX; return `<article class="v7-tcard" data-name="${esc((t.name + ' ' + t.motto).toLowerCase())}" style="--c:${t.color}"><div class="v7-tcardTop"><span class="v7-tcardEmoji">${esc(t.emoji)}</span><div class="f1"><b>${esc(t.name)}</b>${t.official ? ' <span class="chip">Class team</span>' : ''}<div class="tiny muted">${t.memberIds.length} member${t.memberIds.length === 1 ? '' : 's'} · ⭐ ${t.total}${t.allianceId ? ' · 🛡️ Allied' : ''}</div></div></div>${t.motto ? `<p class="tiny mt8 v7-motto">“${esc(t.motto)}”</p>` : ''}<div class="v7-avrow mt8">${t.memberIds.slice(0, 8).map(id => { const s = state.students.find(x => x.id === id); return s ? `<span title="${esc(s.name)}">${av7(s)}</span>` : ''; }).join('')}</div><div class="tiny mt8">${t.memberIds.map(id => esc((state.students.find(x => x.id === id) || {}).name || '')).join(' · ')}</div>${me && !mine && !myClass && !t.official ? `<button class="btn blue sm mt12" ${full ? 'disabled' : ''} data-t="${esc(t.id)}" onclick="joinTeam(this.dataset.t)">${full ? 'Team full' : '🤝 Join team'}</button>` : ''}${me && !mine && myClass && !t.official ? `<button class="btn blue sm mt12" ${full ? 'disabled' : ''} data-t="${esc(t.id)}" onclick="joinTeam(this.dataset.t)">${full ? 'Team full' : '🤝 Join team'}</button>` : ''}${teacher && !t.official ? `<button class="btn red sm mt12" data-t="${esc(t.id)}" onclick="disbandTeam(this.dataset.t)">🗑 Disband</button>` : ''}</article>`; }).join('')}</div></section>` : (me ? '' : '');
+  /* alliances (same element ids as before) */
+  let allyControls = '';
+  const stuTeams = teams.filter(t => !t.official);
+  if (mine && !myAlliance) {
+    allyControls = `<div class="cols-2 mt12">${alliances.length ? `<div><label class="lbl" for="alliance-join">Join an existing alliance</label><select id="alliance-join" class="field"><option value="">Choose alliance…</option>${alliances.map(a => `<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('')}</select><button class="btn blue mt8" onclick="joinAlliance('${esc(mine.id)}')">🤝 Join alliance</button></div>` : ''}<div><label class="lbl" for="alliance-name">Create an alliance</label><input id="alliance-name" class="field" maxlength="32" placeholder="e.g. Galaxy Pact"><label class="lbl mt8" for="alliance-team">Partner team</label><select id="alliance-team" class="field"><option value="">Choose a team…</option>${stuTeams.filter(t => t.id !== mine.id && !t.allianceId).map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select><button class="btn goldb mt8" onclick="formAlliance('${esc(mine.id)}')">🛡️ Create alliance</button></div></div>`;
+  } else if (myAlliance) {
+    allyControls = `<div class="notice mt12">🛡️ Your team is allied with <b>${esc(myAlliance.name)}</b>.</div><label class="lbl mt12" for="alliance-add-team">Add another team to this alliance</label><select id="alliance-add-team" class="field"><option value="">Choose an available team…</option>${stuTeams.filter(t => !t.allianceId).map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select><button class="btn goldb mt8" onclick="addTeamToAlliance('${esc(mine.id)}')">➕ Add team</button>`;
+  }
+  const allyCards = alliances.length ? `<div class="cols-2 mt12">${alliances.map(a => `<article class="v7-ally"><b>🛡️ ${esc(a.name)}</b><div class="v7-allyteams mt8">${(a.teamIds || []).map(id => `<span class="v7-pill">${tname(id)}</span>`).join('<i>↔</i>')}</div></article>`).join('')}</div>` : '<p class="tiny mt8">No alliances yet. Join a team, then ally with another team to cooperate.</p>';
+  return `<div class="stack"><header class="card"><span class="chip gold">CLASS COMMUNITY</span><h1 class="hero-title disp neon mt8">Teams & Partners</h1><p class="muted small mt8">See your partner and project groups, build a team, climb the team leaderboard, and ally with other teams. Stars always stay personal.</p></header>${me ? '' : `<section class="card"><h2 class="ctitle disp">Sign in to join the fun</h2><p class="tiny mt8">${teacher ? 'You’re viewing as teacher. Use Teacher → Groups to assign partners and teams.' : 'Sign in as a student to see your groups and create or join a team.'}</p>${teacher ? '' : '<button class="btn purple mt12" onclick="openStudent()">Student sign in</button>'}</section>`}${myAssignments7(me)}${hero}${creator}${board}${browse}<section class="card"><h2 class="ctitle disp">🛡️ Alliances</h2>${allyCards}${allyControls}</section><section class="card"><h2 class="ctitle disp">Team agreements</h2><p class="tiny mt8">Be welcoming, share the work, and cheer each other on. Alliances connect teams for cooperation; they never move or pool personal stars.</p></section></div>`;
+}
+async function createTeam() {
+  const name = $('team-name')?.value.trim(), motto = $('team-motto')?.value.trim() || '', sid = ui.activeStudentId, emoji = T7.emoji, color = T7.color;
+  if (!name) return showToast('Enter a team name first.', 'info');
+  const r = await mutate(st => { const cfg = ensureTeamSettings(st); if (!st.students.some(x => x.id === sid)) return { error: 'no-student' }; if (cfg.teams.some(t => String(t.name).toLowerCase() === name.toLowerCase())) return { error: 'duplicate' }; if (cfg.teams.some(t => (t.memberIds || []).includes(sid))) return { error: 'member' }; cfg.teams.push({ id: 'team-' + Date.now().toString(36), name, motto, emoji, color, captainId: sid, memberIds: [sid], allianceId: null }); addLog(st, '🤝', name + ' formed a team'); return { ok: true }; });
+  if (r?.error) return showToast(r.error === 'duplicate' ? 'That team name is already in use.' : r.error === 'member' ? 'You are already on a team.' : explainError(r), 'error');
+  celebrate(); sfx('star'); renderView('teams');
+}
+async function joinTeam(id) {
+  id = id || $('team-join')?.value; const sid = ui.activeStudentId; if (!id) return showToast('Choose a team first.', 'info');
+  const r = await mutate(st => { const cfg = ensureTeamSettings(st), t = cfg.teams.find(x => x.id === id); if (!t) return { error: 'missing' }; if (cfg.teams.some(x => (x.memberIds || []).includes(sid))) return { error: 'member' }; t.memberIds = t.memberIds || []; if (t.memberIds.length >= TEAM_MAX) return { error: 'full' }; if (!t.memberIds.includes(sid)) t.memberIds.push(sid); if (!t.captainId) t.captainId = t.memberIds[0]; const s = st.students.find(x => x.id === sid); addLog(st, '🤝', (s ? s.name : 'A student') + ' joined ' + t.name); return { ok: true }; });
+  if (r?.error) return showToast(r.error === 'member' ? 'You are already on a team.' : r.error === 'missing' ? 'Team not found.' : r.error === 'full' ? 'That team is full.' : explainError(r), 'error');
+  sfx('pop'); renderView('teams');
+}
+function tidy7(cfg) { const removed = new Set(cfg.teams.filter(t => !(t.memberIds || []).length).map(t => t.id)); cfg.teams = cfg.teams.filter(t => !removed.has(t.id)); cfg.teams.forEach(t => { if (!t.memberIds.includes(t.captainId)) t.captainId = t.memberIds[0]; }); cfg.alliances.forEach(a => a.teamIds = (a.teamIds || []).filter(id => !removed.has(id))); cfg.alliances = cfg.alliances.filter(a => a.teamIds.length > 1); cfg.teams.forEach(t => t.allianceId = (cfg.alliances.find(a => a.teamIds.includes(t.id)) || {}).id || null); }
+async function leaveTeam() { const sid = ui.activeStudentId; const r = await mutate(st => { const cfg = ensureTeamSettings(st); cfg.teams.forEach(t => t.memberIds = (t.memberIds || []).filter(x => x !== sid)); tidy7(cfg); return { ok: true }; }); if (r?.error) return showToast(explainError(r), 'error'); renderView('teams'); }
+function kickMember(tid, sid) { const s = state.students.find(x => x.id === sid); askConfirm('Remove ' + (s ? s.name : 'this student') + ' from the team?', async () => { const r = await mutate(st => { const cfg = ensureTeamSettings(st), t = cfg.teams.find(x => x.id === tid); if (!t) return { error: 'missing' }; t.memberIds = t.memberIds.filter(x => x !== sid); tidy7(cfg); return { ok: true }; }); if (r?.error) return showToast(explainError(r), 'error'); renderView('teams'); }); }
+async function makeCaptain(tid, sid) { const r = await mutate(st => { const t = ensureTeamSettings(st).teams.find(x => x.id === tid); if (!t || !t.memberIds.includes(sid)) return { error: 'missing' }; t.captainId = sid; return { ok: true }; }); if (r?.error) return showToast(explainError(r), 'error'); showToast('New captain crowned! 👑', 'success'); renderView('teams'); }
+function disbandTeam(tid) { const t = (state.settings.teams || []).find(x => x.id === tid); askConfirm('Disband “' + (t ? t.name : 'this team') + '”?', async () => { const r = await mutate(st => { const cfg = ensureTeamSettings(st); cfg.teams = cfg.teams.filter(x => x.id !== tid); tidy7(cfg); return { ok: true }; }); if (r?.error) return showToast(explainError(r), 'error'); renderView('teams'); }); }
+function openTeamEdit() {
+  const me = activeStudent(), t = me && allTeams7().find(x => !x.official && x.memberIds.includes(me.id)); if (!t || t.captainId !== me.id) return;
+  T7.editEmoji = t.emoji; T7.editColor = t.color; T7.editId = t.id;
+  openModal(`${modalHead('Edit your team')}<label class="lbl mt12" for="te-name">Team name</label><input id="te-name" class="field" maxlength="32" value="${esc(t.name)}"><label class="lbl mt12" for="te-motto">Motto</label><input id="te-motto" class="field" maxlength="60" value="${esc(t.motto)}"><label class="lbl mt12">Emoji</label>${emojiPick7(t.emoji, 'edit')}<label class="lbl mt12">Color</label>${colorPick7(t.color, 'edit')}<div class="flex jc gap8 mt16"><button class="btn slate" onclick="closeModal()">Cancel</button><button class="btn purple" onclick="saveTeamEdit()">Save</button></div>`);
+}
+async function saveTeamEdit() {
+  const id = T7.editId, name = $('te-name')?.value.trim(), motto = $('te-motto')?.value.trim() || ''; if (!name) return showToast('Team name can’t be empty.', 'info');
+  const r = await mutate(st => { const cfg = ensureTeamSettings(st), t = cfg.teams.find(x => x.id === id); if (!t) return { error: 'missing' }; if (cfg.teams.some(x => x.id !== id && String(x.name).toLowerCase() === name.toLowerCase())) return { error: 'duplicate' }; t.name = name; t.motto = motto; t.emoji = T7.editEmoji || t.emoji; t.color = T7.editColor || t.color; return { ok: true }; });
+  if (r?.error) return showToast(r.error === 'duplicate' ? 'That team name is already in use.' : explainError(r), 'error');
+  closeModal(); renderView('teams');
+}
+
+/* ===================== VIDEO GUIDES (built-in animated walkthrough player) ===================== */
+(function () {
+  const stu = GUIDE_DEFAULTS.find(g => g.id === 'student'), all = GUIDE_DEFAULTS.find(g => g.id === 'everyone');
+  if (stu && !stu.scenes.some(s => s.title === 'Fill out forms')) {
+    stu.scenes.splice(stu.scenes.length - 1, 0,
+      { title: 'Fill out forms', text: 'Open Forms to see quizzes, exit tickets and surveys from your teacher. Answer every question marked with a star, then press Submit.', arrow: 'Top menu → Forms', icon: '📝' },
+      { title: 'Partners and project groups', text: 'When your teacher assigns partners or groups, they appear at the top of the Teams page with everyone’s name.', arrow: 'Top menu → Teams', icon: '📌' });
+  }
+  if (all && !all.scenes.some(s => s.title === 'Make a form')) {
+    all.scenes.splice(all.scenes.length - 1, 0,
+      { title: 'Make a form', text: 'Teacher Hub → Forms. Pick a template or start blank, add questions like Google Forms, turn on quiz mode for auto-grading, then open it to students.', arrow: 'Teacher Hub → Forms', icon: '📝' },
+      { title: 'Make partners and groups', text: 'Teacher Hub → Groups. Choose the core, tell Star Champions who is absent, then assign partners, projects or teams randomly, balanced, or by hand.', arrow: 'Teacher Hub → Groups', icon: '👥' });
+  }
+})();
+const V7G = { timer: null, playing: false, speed: 1, speak: false, draft: null, started: 0, dur: 0 };
+const NAV_ITEMS7 = ['Leaderboard', 'Fun Screen', 'Teams', 'Forms', 'Video Guides', 'Student', 'Teacher'];
+function guideList7() { return state.settings.guideScripts || GUIDE_DEFAULTS; }
+function guideScene() { const list = guideList7(), g = list.find(x => x.id === window.guideChoice) || list[0] || GUIDE_DEFAULTS[0]; const i = Math.max(0, Math.min(window.guideIndex || 0, g.scenes.length - 1)); return { g, sc: g.scenes[i], i }; }
+function guideWebsiteShot(g, i) {
+  const sc = g.scenes[i] || g.scenes[0], arrow = String(sc.arrow || '').toLowerCase();
+  const hit = NAV_ITEMS7.find(n => arrow.includes(n.toLowerCase())) || (arrow.includes('teacher hub') ? 'Teacher' : arrow.includes('dashboard') ? 'Student' : '');
+  const hub = /teacher hub|roster|star dispenser|tabs/.test(arrow);
+  return `<div class="gv-browser"><div class="gv-bar"><i></i><i></i><i></i><span class="gv-url">starchampions.app/${esc((hit || 'home').toLowerCase().replace(/\s+/g, '-'))}</span></div><div class="gv-nav">${NAV_ITEMS7.map(n => `<span class="gv-navi ${n === hit ? 'hit' : ''}">${n}${n === hit ? '<b class="gv-point">👆</b>' : ''}</span>`).join('')}</div><div class="gv-page"><div class="gv-iconwrap"><div class="gv-icon">${esc(sc.icon || '⭐')}</div></div><div class="gv-skel"><i style="width:70%"></i><i style="width:90%"></i><i style="width:55%"></i>${hub ? '<i class="tab" style="width:40%"></i>' : ''}</div></div></div>`;
+}
+function renderGuidesView() {
+  const list = guideList7(); if (!list.find(x => x.id === window.guideChoice)) window.guideChoice = list[0].id;
+  const { g } = guideScene(), teacher = !!ui.teacher; setTimeout(paintGuide, 0);
+  return `<div class="stack"><header class="card"><span class="chip gold">STAR CHAMPIONS WALKTHROUGH</span><h1 class="hero-title disp neon mt8">Video Guides</h1><p class="muted small mt8">Animated step-by-step walkthroughs that play right here — no downloads. Press play, or click any step.</p><div class="flex fw gap8 mt16">${list.map(x => `<button class="btn ${x.id === g.id ? 'purple' : 'slate'}" data-id="${esc(x.id)}" onclick="selectGuide(this.dataset.id)">${x.id === 'student' ? '🎓' : x.id === 'everyone' ? '🧑‍🏫' : '🎬'} ${esc(x.title)}</button>`).join('')}</div></header><section class="card guide-player"><div class="gv-stage" id="guide-stage"><div id="guide-shot" class="gv-shot"></div><div class="gv-cap"><div class="gv-count" id="guide-counter"></div><div class="gv-title disp" id="guide-title"></div><div class="gv-arrow" id="guide-arrow"></div><p class="gv-text" id="guide-text"></p></div><div class="gv-prog"><i id="guide-prog"></i></div></div><div class="gv-ctrls"><button class="btn slate" onclick="guideStep(-1)" aria-label="Previous scene">⏮</button><button class="btn purple lg" id="guide-play" onclick="toggleGuidePlayback()">▶ Play video</button><button class="btn slate" onclick="guideStep(1)" aria-label="Next scene">⏭</button><div class="gv-dots" id="guide-dots"></div><select class="field gv-speed" onchange="V7G.speed=Number(this.value);if(V7G.playing)queueGuide7()" aria-label="Speed"><option value="0.75">Slow</option><option value="1" selected>Normal</option><option value="1.5">Fast</option></select><button class="btn slate sm" id="guide-voice-btn" onclick="toggleGuideVoice()">🔊 Voice: ${V7G.speak ? 'On' : 'Off'}</button><button class="btn slate sm" id="guide-music-btn" onclick="toggleGuideMusic()">♫ Music: ${window.guideMusic ? 'On' : 'Off'}</button><button class="btn slate sm" onclick="guideFull()">⛶ Full screen</button></div></section><section class="card"><h3 class="ctitle disp">Chapters</h3><div class="gv-chapters mt12">${g.scenes.map((s, i) => `<button class="gv-chap" id="gv-chap-${i}" data-i="${i}" onclick="guideGo(Number(this.dataset.i))"><span>${esc(s.icon || '⭐')}</span><b>${i + 1}. ${esc(s.title)}</b></button>`).join('')}</div></section>${teacher ? renderGuideEditor7() : ''}</div>`;
+}
+function paintGuideDots7() { const { g, i } = guideScene(), d = $('guide-dots'); if (d) d.textContent = (i + 1) + ' / ' + g.scenes.length; document.querySelectorAll('.gv-chap').forEach((c, k) => c.classList.toggle('on', k === i)); }
+function paintGuide() {
+  const { g, sc, i } = guideScene(); if (!sc) return; window.guideIndex = i;
+  const shot = $('guide-shot'); if (shot) { shot.classList.remove('gv-in'); void shot.offsetWidth; shot.innerHTML = guideWebsiteShot(g, i); shot.classList.add('gv-in'); }
+  for (const [id, v] of [['guide-arrow', '➡ ' + (sc.arrow || 'Next step')], ['guide-counter', `SCENE ${i + 1} / ${g.scenes.length}`], ['guide-title', sc.title], ['guide-text', sc.text]]) { const e = $(id); if (e) e.textContent = v; }
+  paintGuideDots7();
+}
+function guideDur7(sc) { const words = String((sc.title || '') + ' ' + (sc.text || '')).split(/\s+/).length; return Math.max(5200, words * 430) / (V7G.speed || 1); }
+function queueGuide7() {
+  clearTimeout(V7G.timer); const { g, sc, i } = guideScene(); const p = $('guide-prog'); const dur = guideDur7(sc);
+  if (p) { p.style.transition = 'none'; p.style.width = '0%'; void p.offsetWidth; p.style.transition = `width ${dur}ms linear`; p.style.width = '100%'; }
+  const next = () => { if (!V7G.playing) return; const s = guideScene(); if (s.i >= s.g.scenes.length - 1) { pauseGuide(); const pp = $('guide-prog'); if (pp) { pp.style.transition = 'none'; pp.style.width = '100%'; } const b = $('guide-play'); if (b) b.textContent = '↺ Replay'; return; } window.guideIndex = s.i + 1; paintGuide(); queueGuide7(); };
+  let spoke = false;
+  if (V7G.speak && 'speechSynthesis' in window) { try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(sc.title + '. ' + sc.text); u.rate = V7G.speed; u.onend = () => { if (V7G.playing && spoke) { clearTimeout(V7G.timer); V7G.timer = setTimeout(next, 700); } }; spoke = true; speechSynthesis.speak(u); V7G.timer = setTimeout(next, Math.max(dur, 20000)); return; } catch (e) { } }
+  V7G.timer = setTimeout(next, dur);
+}
+function toggleGuidePlayback() {
+  if (V7G.playing) { pauseGuide(); return; }
+  const s = guideScene(); if (s.i >= s.g.scenes.length - 1) window.guideIndex = 0; paintGuide();
+  V7G.playing = true; window.guideTimer = 1; const b = $('guide-play'); if (b) b.textContent = '⏸ Pause video';
+  if (window.guideMusic) startGuideMusic(); queueGuide7();
+}
+function pauseGuide() { V7G.playing = false; window.guideTimer = null; clearTimeout(V7G.timer); try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch (e) { } const b = $('guide-play'); if (b) b.textContent = '▶ Play video'; const p = $('guide-prog'); if (p) { const w = p.getBoundingClientRect().width, pw = p.parentNode.getBoundingClientRect().width || 1; p.style.transition = 'none'; p.style.width = (w / pw * 100) + '%'; } stopGuideMusic(); }
+function guideStep(d) { const { g, i } = guideScene(); window.guideIndex = (i + d + g.scenes.length) % g.scenes.length; paintGuide(); if (V7G.playing) queueGuide7(); else { const p = $('guide-prog'); if (p) { p.style.transition = 'none'; p.style.width = '0%'; } } }
+function guideGo(i) { window.guideIndex = i; paintGuide(); if (V7G.playing) queueGuide7(); else { const p = $('guide-prog'); if (p) { p.style.transition = 'none'; p.style.width = '0%'; } const st = $('guide-stage'); if (st) st.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }
+function selectGuide(id) { pauseGuide(); window.guideChoice = id; window.guideIndex = 0; V7G.draft = null; renderView('guides'); }
+function toggleGuideVoice() { V7G.speak = !V7G.speak; const b = $('guide-voice-btn'); if (b) b.textContent = '🔊 Voice: ' + (V7G.speak ? 'On' : 'Off'); if (!V7G.speak) { try { speechSynthesis.cancel(); } catch (e) { } } if (V7G.playing) queueGuide7(); }
+function toggleGuideMusic() { window.guideMusic = !window.guideMusic; const b = $('guide-music-btn'); if (b) b.textContent = '♫ Music: ' + (window.guideMusic ? 'On' : 'Off'); if (window.guideMusic && V7G.playing) startGuideMusic(); else stopGuideMusic(); }
+function guideFull() { const s = $('guide-stage'); if (!s) return; try { if (document.fullscreenElement) document.exitFullscreen(); else (s.requestFullscreen || s.webkitRequestFullscreen).call(s); } catch (e) { showToast('Full screen is not available here.', 'info'); } }
+
+/* ---- teacher: edit scenes without JSON ---- */
+function guideDraft7() { if (!V7G.draft) V7G.draft = clone7(guideList7()); return V7G.draft; }
+function renderGuideEditor7() {
+  const d = guideDraft7(), g = d.find(x => x.id === window.guideChoice) || d[0];
+  return `<section class="card"><span class="chip gold">TEACHER</span><h3 class="ctitle disp mt8">Edit this video</h3><p class="tiny mt4">Change the words, icon and “where to click” hint for each scene. Saved for this whole core.</p><div class="stack mt12">${g.scenes.map((s, i) => `<div class="v7-qcard"><div class="flex ac gap8"><input class="field" style="width:64px;text-align:center" maxlength="4" value="${esc(s.icon || '')}" oninput="gvEdit7(${i},'icon',this.value)" aria-label="Icon"><input class="field f1" maxlength="80" value="${esc(s.title)}" oninput="gvEdit7(${i},'title',this.value)" placeholder="Scene title"><button class="v7-ib" ${i === 0 ? 'disabled' : ''} onclick="gvMove7(${i},-1)">↑</button><button class="v7-ib" ${i === g.scenes.length - 1 ? 'disabled' : ''} onclick="gvMove7(${i},1)">↓</button><button class="v7-ib bad" onclick="gvDel7(${i})">🗑</button></div><input class="field mt8" maxlength="80" value="${esc(s.arrow || '')}" oninput="gvEdit7(${i},'arrow',this.value)" placeholder="Where to click, e.g. Top menu → Teams"><textarea class="field mt8" rows="2" maxlength="400" oninput="gvEdit7(${i},'text',this.value)" placeholder="What the narrator says">${esc(s.text)}</textarea></div>`).join('')}</div><div class="flex fw gap8 mt12"><button class="btn slate" onclick="gvAdd7()">➕ Add scene</button><button class="btn goldb" onclick="gvSave7()">💾 Save videos</button><button class="btn red" onclick="gvReset7()">↺ Reset to default</button></div></section>`;
+}
+function gvCur7() { const d = guideDraft7(); return d.find(x => x.id === window.guideChoice) || d[0]; }
+function gvEdit7(i, k, v) { gvCur7().scenes[i][k] = v; }
+function gvMove7(i, dlt) { const a = gvCur7().scenes, j = i + dlt; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; renderView('guides'); }
+function gvDel7(i) { const a = gvCur7().scenes; if (a.length <= 1) return showToast('Keep at least one scene.', 'info'); a.splice(i, 1); renderView('guides'); }
+function gvAdd7() { gvCur7().scenes.push({ title: 'New scene', text: 'Describe this step.', arrow: 'Top menu → …', icon: '⭐' }); renderView('guides'); }
+async function gvSave7() { const d = guideDraft7(); const r = await mutate(st => { st.settings.guideScripts = d; return { ok: true }; }); if (r && r.error) return showToast('Could not save the videos.', 'error'); V7G.draft = null; showToast('Videos saved for this core.', 'success'); renderView('guides'); }
+async function gvReset7() { const r = await mutate(st => { st.settings.guideScripts = null; return { ok: true }; }); if (r && r.error) return showToast('Could not reset.', 'error'); V7G.draft = null; window.guideIndex = 0; showToast('Videos reset to the defaults.', 'success'); renderView('guides'); }
+async function saveGuideScripts() { return gvSave7(); }
+async function resetGuideScripts() { return gvReset7(); }
+
+</script>
 </body>
 </html>
